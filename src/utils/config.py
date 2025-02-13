@@ -80,7 +80,7 @@ class TestParameters:
     percolation: list[float] | float = field(
         default_factory=lambda: [0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 0.99]
     )
-    num_mazes: list[int] | int = field(default_factory=lambda: [1000])
+    num_mazes: list[int] | int = field(default_factory=lambda: [10000])
 
     # Model hyperparameters
     model_name: list[str] | str = field(default_factory=lambda: ['dt_net'])

@@ -12,15 +12,9 @@ def main() -> None:
     # Define test parameters
     test_params = TestParameters()
     test_params.model_name = model_names
-    test_params.num_mazes = 1000
 
     # Perform test
-    df = test(test_params)
-
-    # Print accuracy of each model
-    for model_name in model_names:
-        accuracy = df[df['model_name'] == model_name]['correct'].mean()
-        print(f'{model_name}: {accuracy:.2f}')
+    test(test_params)
 
 
 if __name__ == '__main__':
