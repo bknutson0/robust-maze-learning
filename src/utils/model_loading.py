@@ -1,4 +1,5 @@
 import logging
+import os
 
 import torch
 
@@ -26,7 +27,7 @@ def load_model(model_name: str) -> BaseNet:
 
     elif 'dt_net' in model_name:
         model = DTNet()
-        state_dict = torch.load(f'models/{model_name}', map_location=DEVICE, weights_only=True)['net']
+        state_dict = torch.load(model_name, map_location=DEVICE, weights_only=True)
 
     else:
         raise ValueError(f'Unknown model name: {model_name}')
@@ -71,3 +72,14 @@ def load_model(model_name: str) -> BaseNet:
     logger.info(f'Loaded {model_name} to {DEVICE}')
 
     return model
+
+
+def get_all_model_names() -> list[str]:
+    """Recursively search a folder for all model files ending in .pth."""
+    model_names = []
+    for root, _, files in os.walk('models'):
+        for file in files:
+            if file.endswith('.pth'):
+                model_names.append(os.path.join(root, file))
+
+    return model_names

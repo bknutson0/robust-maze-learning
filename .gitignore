@@ -1,7 +1,8 @@
 # Folders
+data/
 !models/dt_net/original.pth
 models/*
-data/
+outputs/*
 
 # Mac
 .DS_Store

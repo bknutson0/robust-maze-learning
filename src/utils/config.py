@@ -82,7 +82,7 @@ class TestParameters:
 
     # Model hyperparameters
     model_name: list[str] | str = field(default_factory=lambda: ['dt_net'])
-    iters: list[int] | int = field(default_factory=lambda: [30, 60, 90, 100])
+    iters: list[int] | int = field(default_factory=lambda: [30])
 
     # Testing parameters
     batch_size: int = 6
