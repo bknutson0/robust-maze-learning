@@ -22,8 +22,8 @@ def plot_test_results(test_name: str) -> None:
             raise ValueError(f'Expected single train_percolation value for {model_name = }, got {train_percolation = }')
 
     # Sort model names and train percolations by train percolations
-    model_names, train_percolations = zip(
-        *sorted(zip(model_names, train_percolations, strict=False), key=lambda x: x[1]), strict=False
+    model_names, train_percolations = map(
+        list, zip(*sorted(zip(model_names, train_percolations, strict=False), key=lambda x: x[1]), strict=False)
     )
 
     # Ensure only one maze size for each model
