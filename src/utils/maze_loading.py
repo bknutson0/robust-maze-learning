@@ -26,7 +26,7 @@ logger = logging.getLogger(__name__)
 set_serialize_minimal_threshold(int(10**7))
 
 
-def _get_maze_dataset_mazes(
+def _load_mazes(
     dataset_name: str = 'maze-dataset',
     seed: int = 42,
     maze_size: int = 9,
@@ -35,7 +35,7 @@ def _get_maze_dataset_mazes(
     percolation: float = 0.0,
     deadend_start: bool = True,
 ) -> tuple[torch.Tensor, torch.Tensor]:
-    """Generate mazes with the given parameters and load to device."""
+    """Generate at least num mazes mazes of the given size and return inputs and solutions. Recursively tries again."""
     if dataset_name != 'maze-dataset':
         raise NotImplementedError('Only maze-dataset is currently implemented.')
     if maze_size % 2 == 0:
@@ -80,6 +80,13 @@ def _get_maze_dataset_mazes(
         },
     )
 
+    # If no mazes were generated, try again with double the number of mazes, unless num_mazes is too large
+    if len(base_dataset) == 0:
+        if num_mazes > 1000000:
+            raise ValueError(f'Failed to generate any mazes with {num_mazes = }')
+        else:
+            return _load_mazes(dataset_name, seed, maze_size, num_mazes * 2, gen, percolation, deadend_start)
+
     # Convert to tensor
     dataset = dataset.get_batch(idxs=None)  # type: ignore
 
@@ -110,18 +117,11 @@ def load_mazes(
 ) -> tuple[torch.Tensor, torch.Tensor]:
     """Generate mazes of the given size and number, from the given dataset, and load to device."""
     if dataset == 'maze-dataset':
-        inputs, solutions = _get_maze_dataset_mazes(
-            dataset, seed, maze_size, num_mazes, gen, percolation, deadend_start
-        )
-        # Continue generating mazes until desired num_mazes is reached
-        while inputs.shape[0] < num_mazes:
-            new_inputs, new_solutions = _get_maze_dataset_mazes(
-                dataset, seed, maze_size, num_mazes + 10, gen, percolation, deadend_start
-            )
-            inputs = torch.cat([inputs, new_inputs], dim=0)
-            inputs = inputs[:num_mazes]
-            solutions = torch.cat([solutions, new_solutions], dim=0)
-            solutions = solutions[:num_mazes]
+        inputs, solutions = _load_mazes(dataset, seed, maze_size, num_mazes, gen, percolation, deadend_start)
+
+        # Reduce number of mazes if necessary
+        inputs = inputs[:num_mazes]
+        solutions = solutions[:num_mazes]
 
     elif dataset == 'easy-to-hard-data':
         raise NotImplementedError('Easy-to-hard-data not implemented yet.')
