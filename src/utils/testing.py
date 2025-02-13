@@ -11,7 +11,7 @@ from scipy.ndimage import label
 
 from src.utils.config import DEVICE, TestParameters
 from src.utils.maze_loading import maze_loaders
-from src.utils.model_loading import load_model
+from src.utils.model_loading import get_model_hyperparameters, load_model
 
 
 def compare_mazes(mazes_1: torch.Tensor, mazes_2: torch.Tensor) -> torch.Tensor:
@@ -141,6 +141,7 @@ def specific_test(specific_test_params: TestParameters) -> DataFrame:
     test_loader = maze_loaders(specific_test_params)
     for model_name in specific_test_params.model_name:
         model = load_model(model_name)
+        hyperparameters = get_model_hyperparameters(model_name)
         model.eval()
         for batch_idx, (inputs, solutions) in enumerate(test_loader):
             current_batch_size = len(inputs)
@@ -166,10 +167,17 @@ def specific_test(specific_test_params: TestParameters) -> DataFrame:
                         pd.DataFrame(
                             {
                                 'model_name': [model_name] * current_batch_size,
-                                'maze_size': [specific_test_params.maze_size] * current_batch_size,
-                                'percolation': [specific_test_params.percolation] * current_batch_size,
+                                # Hyperparameters
+                                'train_maze_size': [hyperparameters.maze_size] * current_batch_size,
+                                'train_percolation': [hyperparameters.percolation] * current_batch_size,
+                                'train_deadend_start': [hyperparameters.deadend_start] * current_batch_size,
+                                'train_iter': [hyperparameters.iters] * current_batch_size,
+                                # Test parameters
                                 'maze_index': maze_indices,
-                                'iter': [iter_value] * current_batch_size,
+                                'test_maze_size': [specific_test_params.maze_size] * current_batch_size,
+                                'test_percolation': [specific_test_params.percolation] * current_batch_size,
+                                'test_deadend_start': [specific_test_params.deadend_start] * current_batch_size,
+                                'test_iter': [iter_value] * current_batch_size,
                                 'matches_solution': matches_solution,
                                 'valid': are_valid,
                                 'correct': are_minimal,

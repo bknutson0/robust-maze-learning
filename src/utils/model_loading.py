@@ -1,3 +1,4 @@
+import json
 import logging
 import os
 
@@ -5,7 +6,7 @@ import torch
 
 from src.models.base_net import BaseNet
 from src.models.dt_net import DTNet
-from src.utils.config import DEVICE, LOGGING_LEVEL
+from src.utils.config import DEVICE, LOGGING_LEVEL, Hyperparameters
 
 # Create logger
 logging.basicConfig(
@@ -83,3 +84,16 @@ def get_all_model_names() -> list[str]:
                 model_names.append(os.path.join(root, file))
 
     return model_names
+
+
+def get_model_hyperparameters(model_name: str) -> Hyperparameters:
+    """Get hyperparameters for a given model."""
+    # Load results.JSON file
+    results_path = os.path.join(os.path.dirname(model_name), 'results.json')
+    with open(results_path) as f:
+        results = json.load(f)
+
+    # Load results['hyperparameters'] into Hyperparameters object
+    hyperparameters = Hyperparameters(**results['hyperparameters'])
+
+    return hyperparameters

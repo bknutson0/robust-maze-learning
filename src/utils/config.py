@@ -77,15 +77,17 @@ class TestParameters:
     generation_method: list[str] | str = field(default_factory=lambda: ['dfs_perc'])
     maze_size: list[int] | int = field(default_factory=lambda: [9])
     deadend_start: list[bool] | bool = field(default_factory=lambda: [True])
-    percolation: list[float] | float = field(default_factory=lambda: [0.0])
-    num_mazes: list[int] | int = field(default_factory=lambda: [100])
+    percolation: list[float] | float = field(
+        default_factory=lambda: [0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 0.99]
+    )
+    num_mazes: list[int] | int = field(default_factory=lambda: [1000])
 
     # Model hyperparameters
     model_name: list[str] | str = field(default_factory=lambda: ['dt_net'])
     iters: list[int] | int = field(default_factory=lambda: [30])
 
     # Testing parameters
-    batch_size: int = 6
+    batch_size: int = 256
 
     def to_json(self, path: str) -> None:
         """Save test parameters to JSON file."""
