@@ -1,5 +1,6 @@
 # Folders
-models/
+models/*
+!models/dt_net/original.pth
 data/
 
 # Mac
