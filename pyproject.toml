@@ -1,0 +1,74 @@
+[project]
+name = "robust-maze-learning"
+version = "0.1.0"
+description = "framework for training and testing maze-solving models"
+authors = [
+	{ name = "Brandon Knutson", email = "bknutson@mines.edu" }
+]
+readme = "README.md"
+requires-python = ">=3.10.6,<3.12.0"
+
+dependencies = [
+    "numpy==1.26.4",
+    "torch>=2.6.0",
+    "scipy>=1.15.1",
+    "maze-dataset",
+]
+
+[dependency-groups]
+dev = [
+	# lint
+	"ruff>=0.9.6",
+	# type check
+	"mypy>=1.15.0",
+	# test
+	"pytest>=8.3.4",
+	# coverage
+	"pytest-cov>=6.0.0",
+	#"coverage-badge",
+	# logging
+	"tensorboard>=2.18.0",
+]
+
+[tool.ruff]
+	target-version = 'py310'  # Target Python version (adjust as needed)
+	line-length = 120         # Set max line length for all tools
+
+[tool.ruff.lint]  
+	select = [
+        "D",      # pydocstyle: enforce docstring conventions
+		"E",      # pycodestyle: enforce style rules
+		"F",      # Pyflakes: detect coding errors
+		"W",      # pycodestyle warnings
+		"I",      # isort: sort imports, remove unused imports
+		"N",      # pep8-naming: enforce naming conventions
+		"UP",     # pyupgrade: modernize syntax for newer Python versions
+		"B",      # flake8-bugbear: detect common security and performance issues
+		"C4",     # flake8-comprehensions: simplify comprehensions
+		"SIM",    # flake8-simplify: detect redundant expressions
+		"ANN",    # flake8-annotations: check for type hints
+		"S",      # flake8-bandit: test for security
+		#"FIX002", # flake8-fixme: check for TODO
+	]
+	ignore = [
+		"D100",      # pydocstyle: ignore missing public module docstring
+		"ANN002",    # flake8-annotations: ignore missing type hints for *args
+		"ANN003",    # flake8-annotations: ignore missing type hints for **kwargs
+	]
+
+[tool.ruff.lint.pydocstyle]
+    convention = "google" # Format docstrings
+
+[tool.ruff.format]
+	quote-style = "single"  # Use single quotes for consistency
+	indent-style = "space"  # Use spaces for indentation
+
+[tool.mypy]
+	strict = true  # Enforce strict type checking
+	incremental = true  # Speed up repeated runs
+	disallow_untyped_calls = false  # Allow calling functions without type hints
+	ignore_missing_imports = true  # Ignore missing type hints in external libraries
+	cache_dir = ".mypy_cache"
+
+[tool.uv.sources]
+	maze-dataset = { git = "https://github.com/bknutson0/maze-dataset", branch = "improve-maze-generation" }
