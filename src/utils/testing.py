@@ -160,44 +160,37 @@ def specific_test(specific_test_params: TestParameters) -> DataFrame:
                 are_minimal = is_minimal_path(inputs, predictions[iter_index], solutions).cpu().numpy()
                 # TODO: Add more tests, such as: count_start_neighbors, distance from center, count percolations, etc.
 
-                # Concatenate test results to result DataFrame
                 result = pd.concat(
                     [
                         result,
                         pd.DataFrame(
                             {
-                                'model_name': [model_name] * current_batch_size,
-                                # Hyperparameters
-                                'train_maze_size': [hyperparameters.maze_size] * current_batch_size,
-                                'train_percolation': [hyperparameters.percolation] * current_batch_size,
-                                'train_deadend_start': [hyperparameters.deadend_start] * current_batch_size,
-                                'train_iter': [hyperparameters.iters] * current_batch_size,
-                                # Test parameters
-                                'maze_index': maze_indices,
-                                'test_maze_size': [specific_test_params.maze_size] * current_batch_size,
-                                'test_percolation': [specific_test_params.percolation] * current_batch_size,
-                                'test_deadend_start': [specific_test_params.deadend_start] * current_batch_size,
-                                'test_iter': [iter_value] * current_batch_size,
-                                'matches_solution': matches_solution,
-                                'valid': are_valid,
-                                'correct': are_minimal,
-                                #'start_neighbors': start_neighbors
-                            },
-                            dtype={
-                                'model_name': 'string',
-                                'train_maze_size': 'int64',
-                                'train_percolation': 'float64',
-                                'train_deadend_start': 'int64',
-                                'train_iter': 'int64',
-                                'maze_index': 'int64',
-                                'test_maze_size': 'int64',
-                                'test_percolation': 'float64',
-                                'test_deadend_start': 'int64',
-                                'test_iter': 'int64',
-                                'matches_solution': 'bool',
-                                'valid': 'bool',
-                                'correct': 'bool',
-                            },
+                                'model_name': pd.Series([model_name] * current_batch_size, dtype='string'),
+                                'train_maze_size': pd.Series(
+                                    [hyperparameters.maze_size] * current_batch_size, dtype='int64'
+                                ),
+                                'train_percolation': pd.Series(
+                                    [hyperparameters.percolation] * current_batch_size, dtype='float64'
+                                ),
+                                'train_deadend_start': pd.Series(
+                                    [hyperparameters.deadend_start] * current_batch_size, dtype='int64'
+                                ),
+                                'train_iter': pd.Series([hyperparameters.iters] * current_batch_size, dtype='int64'),
+                                'maze_index': pd.Series(maze_indices, dtype='int64'),
+                                'test_maze_size': pd.Series(
+                                    [specific_test_params.maze_size] * current_batch_size, dtype='int64'
+                                ),
+                                'test_percolation': pd.Series(
+                                    [specific_test_params.percolation] * current_batch_size, dtype='float64'
+                                ),
+                                'test_deadend_start': pd.Series(
+                                    [specific_test_params.deadend_start] * current_batch_size, dtype='int64'
+                                ),
+                                'test_iter': pd.Series([iter_value] * current_batch_size, dtype='int64'),
+                                'matches_solution': pd.Series(matches_solution, dtype='bool'),
+                                'valid': pd.Series(are_valid, dtype='bool'),
+                                'correct': pd.Series(are_minimal, dtype='bool'),
+                            }
                         ),
                     ],
                     ignore_index=True,
