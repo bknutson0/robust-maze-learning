@@ -12,8 +12,7 @@ def main() -> None:
     # Define test parameters
     test_params = TestParameters()
     test_params.model_name = model_names
-    test_params.num_mazes = 10
-    test_params.percolation = [0.99]
+    test_params.num_mazes = 1000
 
     # Perform test
     df = test(test_params)

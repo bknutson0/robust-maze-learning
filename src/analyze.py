@@ -1,17 +1,11 @@
-from src.utils.model_loading import get_all_model_names, get_model_hyperparameters
+from src.utils.analysis import plot_test_results
 
 
 def main() -> None:
     """Analyze test results."""
-    model_names = get_all_model_names()
+    test_name = '2025-02-13_12:08:52'
 
-    # Filter model names, keeping only those that contain 'best'
-    best_models = [name for name in model_names if ('best' in name) and (('20250211' in name) or ('20250210' in name))]
-
-    model = best_models[0]
-    hyperparameters = get_model_hyperparameters(model)
-
-    print(hyperparameters)
+    plot_test_results(test_name)
 
 
 if __name__ == '__main__':

@@ -182,7 +182,22 @@ def specific_test(specific_test_params: TestParameters) -> DataFrame:
                                 'valid': are_valid,
                                 'correct': are_minimal,
                                 #'start_neighbors': start_neighbors
-                            }
+                            },
+                            dtype={
+                                'model_name': 'string',
+                                'train_maze_size': 'int64',
+                                'train_percolation': 'float64',
+                                'train_deadend_start': 'int64',
+                                'train_iter': 'int64',
+                                'maze_index': 'int64',
+                                'test_maze_size': 'int64',
+                                'test_percolation': 'float64',
+                                'test_deadend_start': 'int64',
+                                'test_iter': 'int64',
+                                'matches_solution': 'bool',
+                                'valid': 'bool',
+                                'correct': 'bool',
+                            },
                         ),
                     ],
                     ignore_index=True,
