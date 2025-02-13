@@ -151,7 +151,7 @@ def specific_test(specific_test_params: TestParameters) -> DataFrame:
                 )
             )
             predictions = model.predict(inputs, specific_test_params.iters, False)
-
+            predictions = predictions if isinstance(predictions, list) else [predictions]
             for iter_index, iter_value in enumerate(specific_test_params.iters):  # type: ignore
                 # Tests cannot currently handle extra iters dimension TODO: Handle extra iters dimension
                 matches_solution = compare_mazes(predictions[iter_index], solutions).cpu().numpy()
@@ -165,7 +165,7 @@ def specific_test(specific_test_params: TestParameters) -> DataFrame:
                         result,
                         pd.DataFrame(
                             {
-                                'model_name': [specific_test_params.model_name] * current_batch_size,
+                                'model_name': [model_name] * current_batch_size,
                                 'maze_size': [specific_test_params.maze_size] * current_batch_size,
                                 'percolation': [specific_test_params.percolation] * current_batch_size,
                                 'maze_index': maze_indices,
