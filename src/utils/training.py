@@ -155,7 +155,7 @@ def train(hyperparams: Hyperparameters) -> float:
     best_val_acc = 0.0
 
     # Create run directory
-    run_name = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
+    run_name = datetime.datetime.now().strftime('%Y-%m-%d_%H:%M:%S')
     run_dir = os.path.join('models', hyperparams.model_name, run_name)
     os.makedirs(run_dir, exist_ok=True)
     logger.info(f'Starting training run {run_name} for {hyperparams.model_name} on {DEVICE}.')
