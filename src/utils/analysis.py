@@ -45,9 +45,11 @@ def plot_test_accuracies(test_name: str) -> None:
 
     # Plot accuracy versus test percolation for each model
     for model_name, train_percolation, color in zip(model_names, train_percolations, colors, strict=False):
-        if train_percolation in [0.003, 0.9, 0.0, 0.3, 0.01, 0.6, 0.1, 0.5, 0.4, 0.03, 0.7, 0.001]:
+        # [0.003, 0.9, 0.0, 0.3, 0.01, 0.6, 0.1, 0.5, 0.4, 0.03, 0.7, 0.001]
+        if train_percolation in [0.9]:
             df_subset = df[df['model_name'] == model_name]
-            df_subset = df_subset.groupby('test_percolation')['correct'].mean().reset_index()  # Get mean accuracy
+
+            df_subset = df_subset.groupby('test_percolation')['correct'].mean().reset_index()
             df_subset = df_subset.sort_values(by='test_percolation')  # Ensure sorted order
 
             plt.plot(
@@ -62,6 +64,22 @@ def plot_test_accuracies(test_name: str) -> None:
                 zorder=3,
             )
 
+            # Compute and plot average 'matches_solution' as well
+            df_subset = df[df['model_name'] == model_name]
+            df_subset = df_subset.groupby('test_percolation')['matches_solution'].mean().reset_index()
+            df_subset = df_subset.sort_values(by='test_percolation')
+            plt.plot(
+                df_subset['test_percolation'],
+                df_subset['matches_solution'],
+                marker='o',
+                linestyle='-',
+                linewidth=5,
+                markersize=10,
+                label=f'{train_percolation:.3f}',
+                color='black',
+                zorder=3,
+            )
+
             # Add vertical dashed line at train_percolation
             plt.axvline(x=train_percolation, color=color, linestyle='dashed', linewidth=5, zorder=1)
 
@@ -72,13 +90,13 @@ def plot_test_accuracies(test_name: str) -> None:
 
     # Set axis limits
     plt.xlim(0, 1)
-    plt.ylim(0.90, 1)
+    plt.ylim(0, 1)
 
     # # Adjust layout to prevent clipping
     # plt.tight_layout()
 
     # Save the plot
-    plt.savefig(f'outputs/tests/{test_name}/plot.png', bbox_inches='tight')
+    plt.savefig(f'outputs/tests/{test_name}/plot5.png', bbox_inches='tight')
     plt.close()
 
 
