@@ -37,10 +37,11 @@ class Hyperparameters:
     maze_size: int = 9
     deadend_start: bool = True
     percolation: float = 0.0
-    num_mazes: int = 50000
+    num_mazes: int = 100000
 
     # Model hyperparameters
     model_name: str = 'dt_net'
+    pretrained = True
     iters: int = 30
 
     # Training parameters

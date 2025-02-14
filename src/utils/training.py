@@ -65,7 +65,7 @@ def train_epoch(
             latents = model.latent_forward(latents_initial, inputs, iters=n, grad=False)
 
             # Iterate k times with gradient tracking
-            latents = model.latent_forward(latents, inputs, iters=k, grad=True)
+            latents = model.latent_forward(latents, inputs, iters=k, grad=True)  # type: ignore
 
             # Compute progressive loss
             outputs = model.latent_to_output(latents, grad=True)
@@ -109,10 +109,10 @@ def train_epoch(
     learning_rate_scheduler.step(val_acc)
 
     if writer is not None:
-        writer.add_scalar('loss/train_epoch', train_loss, epoch)
-        writer.add_scalar('accuracy/train_epoch', train_acc, epoch)
-        writer.add_scalar('loss/validation_epoch', val_loss, epoch)
-        writer.add_scalar('accuracy/validation_epoch', val_acc, epoch)
+        writer.add_scalar('loss/train_epoch', train_loss, epoch + 1)
+        writer.add_scalar('accuracy/train_epoch', train_acc, epoch + 1)
+        writer.add_scalar('loss/validation_epoch', val_loss, epoch + 1)
+        writer.add_scalar('accuracy/validation_epoch', val_acc, epoch + 1)
 
     return train_loss, train_acc, val_loss, val_acc
 
@@ -129,7 +129,7 @@ def compute_average_loss_and_accuracy(
         for inputs, solutions in loader:
             # Compute loss
             latents = model.input_to_latent(inputs, grad=False)
-            latents = model.latent_forward(latents, inputs, iters=hyperparams.iters, grad=False)
+            latents = model.latent_forward(latents, inputs, iters=hyperparams.iters, grad=False)  # type: ignore
             outputs = model.latent_to_output(latents, grad=False)
             torch.use_deterministic_algorithms(False)
             loss = criterion(outputs, solutions).mean()
@@ -138,7 +138,7 @@ def compute_average_loss_and_accuracy(
 
             # Compute corrects
             predictions = model.output_to_prediction(outputs, inputs, grad=False)
-            corrects = is_minimal_path(inputs, predictions, solutions)
+            corrects = is_minimal_path(inputs, predictions, solutions)  # type: ignore
             total_correct += int(corrects.sum().item())
             total_samples += inputs.size(0)
 

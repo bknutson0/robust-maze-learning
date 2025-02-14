@@ -16,58 +16,58 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
-def load_model(model_name: str) -> BaseNet:
-    """Load the saved model onto device."""
-    # Initialize model and load weights
+def load_model(model_name: str, pretrained: bool = True) -> BaseNet:
+    """Initialize model and load weights if pretrained."""
     model: BaseNet
     state_dict = None
 
-    if model_name == 'dt_net':
+    # Initialize model
+    if 'dt_net' in model_name:
         model = DTNet()
-        state_dict = torch.load('models/dt_net/original.pth', map_location=DEVICE, weights_only=True)['net']
+    elif model_name == 'pi_net':
+        raise NotImplementedError('PINet model not implemented yet')
+        #     cfg_path = 'models/pi_net/aric/config.yaml'
+        #     model_path = 'models/pi_net/aric/model_best_130_100.0.pth'
 
-    elif 'dt_net' in model_name:
-        model = DTNet()
-        state_dict = torch.load(model_name, map_location=DEVICE, weights_only=True)
+        #     # Get config dictionary, convert to omega config, and fix attributes
+        #     with open(cfg_path) as f:
+        #         cfg_dict = yaml.load(f, Loader=yaml.FullLoader)
+        #     cfg = OmegaConf.create(cfg_dict)
+        #     cfg.problem.deq.jacobian_factor = 1.0
+        #     cfg.problem.model.model_path = model_path
 
+        #     # Create model and load weights
+        #     model = PINet(width=cfg.problem.model.width, in_channels=3, config=cfg)
+        #     state_dict = torch.load(model_path, map_location=device, weights_only=True)['net']
+    elif model_name == 'it_net':
+        raise NotImplementedError('ITNet model not implemented yet')
+        # model = ITNet()
+        # state_dict = torch.load('models/it_net.pth', map_location=DEVICE, weights_only=True)['net']
     else:
         raise ValueError(f'Unknown model name: {model_name}')
 
-    # TODO: add other models
-    # Otherwise, if first 6 characters are 'dt_net', load corresponding model
-    # elif model_name[:6] == 'dt_net':
-    #     model = DTNet()
-    #     state_dict = torch.load(f'models/dt_net/{model_name}.pth', map_location=DEVICE, weights_only=True)
-
-    # elif model_name == 'it_net':
-    #     model = ITNet()
-    #     state_dict = torch.load('models/it_net.pth', map_location=device, weights_only=True)['net']
-
-    # elif model_name == 'pi_net':
-    #     cfg_path = 'models/pi_net/aric/config.yaml'
-    #     model_path = 'models/pi_net/aric/model_best_130_100.0.pth'
-
-    #     # Get config dictionary, convert to omega config, and fix attributes
-    #     with open(cfg_path) as f:
-    #         cfg_dict = yaml.load(f, Loader=yaml.FullLoader)
-    #     cfg = OmegaConf.create(cfg_dict)
-    #     cfg.problem.deq.jacobian_factor = 1.0
-    #     cfg.problem.model.model_path = model_path
-
-    #     # Create model and load weights
-    #     model = PINet(width=cfg.problem.model.width, in_channels=3, config=cfg)
-    #     state_dict = torch.load(model_path, map_location=device, weights_only=True)['net']
-
-    # Fix state_dict keys
-    if state_dict is not None:
-        new_state_dict = {k.replace('module.', ''): v for k, v in state_dict.items()}
-    else:
-        raise ValueError(f'Failed to load model {model_name}, state_dict is None')
-
-    # Load weights to model
+    # Move model to device and set to eval mode
     model.to(DEVICE)
     model.eval()
-    model.load_state_dict(new_state_dict, strict=True)
+
+    # Load pretrained weights
+    if pretrained:
+        # Load state dict
+        if model_name == 'dt_net':
+            state_dict = torch.load('models/dt_net/original.pth', map_location=DEVICE, weights_only=True)['net']
+        elif model_name == 'pi_net':
+            raise NotImplementedError('PINet model not implemented yet')
+        elif model_name == 'it_net':
+            raise NotImplementedError('ITNet model not implemented yet')
+        else:
+            state_dict = torch.load(model_name, map_location=DEVICE, weights_only=True)
+
+        # Load state dict into model
+        if state_dict is None:
+            raise ValueError(f'Failed to load pretrained weights for model: {model_name}')
+        else:
+            new_state_dict = {k.replace('module.', ''): v for k, v in state_dict.items()}
+            model.load_state_dict(new_state_dict, strict=True)
 
     # Log model loading
     logger.info(f'Loaded {model_name} to {DEVICE}')
