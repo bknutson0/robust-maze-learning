@@ -41,7 +41,7 @@ class Hyperparameters:
 
     # Model hyperparameters
     model_name: str = 'dt_net'
-    pretrained = True
+    pretrained: bool = True
     iters: int = 30
 
     # Training parameters
