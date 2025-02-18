@@ -12,6 +12,9 @@ def main() -> None:
     # Define test parameters
     test_params = TestParameters()
     test_params.model_name = model_names
+    test_params.maze_size = [9, 15, 19, 25]
+    test_params.num_mazes = 100
+    test_params.iters = [30, 100, 300]
 
     # Perform test
     test(test_params)
