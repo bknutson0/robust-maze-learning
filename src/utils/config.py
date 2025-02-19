@@ -90,6 +90,10 @@ class TestParameters:
     # Testing parameters
     batch_size: int = 256
 
+    def are_single_valued(self) -> bool:
+        """Check if all parameters are single-valued."""
+        return all(isinstance(value, bool | int | float | str) for value in asdict(self).values())
+
     def to_json(self, path: str) -> None:
         """Save test parameters to JSON file."""
         os.makedirs(os.path.dirname(path), exist_ok=True)

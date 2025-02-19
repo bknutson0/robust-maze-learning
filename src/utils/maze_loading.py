@@ -1,5 +1,6 @@
 import logging
 import warnings
+from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
@@ -26,44 +27,41 @@ logger = logging.getLogger(__name__)
 set_serialize_minimal_threshold(int(10**7))
 
 
-def _load_mazes(
-    dataset_name: str = 'maze-dataset',
-    seed: int = 42,
-    maze_size: int = 9,
-    num_mazes: int = 1,
-    gen: str = 'dfs_perc',  #
-    percolation: float = 0.0,
-    deadend_start: bool = True,
-) -> tuple[torch.Tensor, torch.Tensor]:
-    """Generate at least num mazes mazes of the given size and return inputs and solutions. Recursively tries again."""
-    if dataset_name != 'maze-dataset':
+def _load_mazes(params: Hyperparameters | TestParameters) -> tuple[torch.Tensor, torch.Tensor]:
+    """Generate at least num_mazes mazes, recursively doubling the number of mazes attempted if none are generated."""
+    logger.info(
+        f'Generating {params.num_mazes} mazes with size: {params.maze_size}, percolation: {params.percolation}, '
+        f'and deadend_start: {params.deadend_start}'
+    )
+
+    if params.dataset_name != 'maze-dataset':
         raise NotImplementedError('Only maze-dataset is currently implemented.')
-    if maze_size % 2 == 0:
-        raise ValueError(f'Expected odd maze size, got {maze_size}.')
-    grid_n = (maze_size + 1) // 2
+    if params.maze_size % 2 == 0:  # type: ignore
+        raise ValueError(f'Expected odd maze size, got {params.maze_size}.')
+    grid_n = (params.maze_size + 1) // 2  # type: ignore
 
     # Generate base maze dataset
-    if gen == 'dfs':
+    if params.generation_method == 'dfs':
         maze_ctor = LatticeMazeGenerators.gen_dfs
         maze_ctor_kwargs = {}
-    elif gen == 'dfs_perc':
+    elif params.generation_method == 'dfs_perc':
         maze_ctor = LatticeMazeGenerators.gen_dfs_percolation  # type: ignore
-        maze_ctor_kwargs = {'p': percolation}
-    elif gen == 'percolation':
+        maze_ctor_kwargs = {'p': params.percolation}
+    elif params.generation_method == 'percolation':
         maze_ctor = LatticeMazeGenerators.gen_percolation  # type: ignore
-        maze_ctor_kwargs = {'p': percolation}
+        maze_ctor_kwargs = {'p': params.percolation}
     endpoint_kwargs = {
-        'deadend_start': deadend_start,
+        'deadend_start': params.deadend_start,
         'endpoints_not_equal': True,
         'except_on_no_valid_endpoint': False,
     }
 
     base_dataset: MazeDataset = MazeDataset.from_config(  # type: ignore
         MazeDatasetConfig(  # type: ignore
-            name=f'test-{seed}',
+            name=f'test-{params.seed}',
             grid_n=grid_n,
-            n_mazes=num_mazes,
-            seed=seed,
+            n_mazes=params.num_mazes,
+            seed=params.seed,
             maze_ctor=maze_ctor,
             maze_ctor_kwargs=maze_ctor_kwargs,
             endpoint_kwargs=endpoint_kwargs,
@@ -80,12 +78,13 @@ def _load_mazes(
         },
     )
 
-    # If no mazes were generated, try again with double the number of mazes, unless num_mazes is too large
-    if len(base_dataset) == 0:
-        if num_mazes > 1000000:
-            raise ValueError(f'Failed to generate any mazes with {num_mazes = }')
+    # If no mazes were generated, attempt twice as many mazes, unless num_mazes is too large
+    if len(base_dataset) == 0:  # type: ignore
+        if params.num_mazes > 10**9:  # type: ignore
+            raise ValueError(f'Failed to generate any mazes with {params.num_mazes = }')
         else:
-            return _load_mazes(dataset_name, seed, maze_size, num_mazes * 2, gen, percolation, deadend_start)
+            new_params = replace(params, num_mazes=params.num_mazes * 2)  # type: ignore
+            return _load_mazes(new_params)
 
     # Convert to tensor
     dataset = dataset.get_batch(idxs=None)  # type: ignore
@@ -106,24 +105,27 @@ def _load_mazes(
     return inputs, solutions
 
 
-def load_mazes(
-    dataset: str = 'maze-dataset',
-    seed: int = 42,
-    maze_size: int = 9,
-    num_mazes: int = 1,
-    gen: str = 'dfs_perc',
-    percolation: float = 0.0,
-    deadend_start: bool = True,
-) -> tuple[torch.Tensor, torch.Tensor]:
+def load_mazes(params: Hyperparameters | TestParameters) -> tuple[torch.Tensor, torch.Tensor]:
     """Generate mazes of the given size and number, from the given dataset, and load to device."""
-    if dataset == 'maze-dataset':
-        inputs, solutions = _load_mazes(dataset, seed, maze_size, num_mazes, gen, percolation, deadend_start)
+    if params.dataset_name == 'maze-dataset':
+        inputs, solutions = _load_mazes(params)
+
+        # Generate more mazes if necessary
+        new_params = replace(params, num_mazes=params.num_mazes * 2)  # type: ignore
+        while len(inputs) < params.num_mazes:  # type: ignore
+            # Attempt twice as many mazes
+            new_params = replace(params, seed=new_params.seed + 1, num_mazes=new_params.num_mazes * 2)  # type: ignore
+            new_inputs, new_solutions = _load_mazes(new_params)
+
+            # Add new mazes to existing mazes
+            inputs = torch.cat([inputs, new_inputs], dim=0)
+            solutions = torch.cat([solutions, new_solutions], dim=0)
 
         # Reduce number of mazes if necessary
-        inputs = inputs[:num_mazes]
-        solutions = solutions[:num_mazes]
+        inputs = inputs[: params.num_mazes]  # type: ignore
+        solutions = solutions[: params.num_mazes]  # type: ignore
 
-    elif dataset == 'easy-to-hard-data':
+    elif params.dataset_name == 'easy-to-hard-data':
         raise NotImplementedError('Easy-to-hard-data not implemented yet.')
         # from easy_to_hard_data import MazeDataset as EasyToHardMazeDataset TODO: Fix import
         # """ https://github.com/aks2203/easy-to-hard-data """
@@ -139,8 +141,8 @@ def load_mazes(
         # solutions = maze_dataset.targets[:num_mazes].float().detach().to(DEVICE, dtype=torch.float32)
 
     logger.info(
-        f'Loaded {num_mazes} mazes with size: {maze_size}, percolation: {percolation}, '
-        f'and deadend_start: {deadend_start}'
+        f'Loaded {params.num_mazes} mazes with size: {params.maze_size}, percolation: {params.percolation}, '
+        f'and deadend_start: {params.deadend_start}'
     )
 
     return inputs, solutions
@@ -150,26 +152,10 @@ def maze_loaders(
     params: Hyperparameters | TestParameters,
 ) -> tuple[DataLoader[Any], DataLoader[Any], DataLoader[Any]] | DataLoader[Any]:
     """Load the maze dataset and return data loaders for training and validation, or testing."""
+    if isinstance(params, TestParameters) and not params.are_single_valued():
+        raise ValueError('TestParameters must have a single value for each parameter.')
 
-    # Load the maze dataset
-    def ensure_single_value(value: Any, name: str) -> Any:  # noqa: ANN401
-        """Ensure the parameter is a single value, not an empty or multi-value list."""
-        if isinstance(value, list):
-            if len(value) == 1:
-                return value[0]
-            else:
-                raise ValueError(f'Expected {name} to have exactly one value, but got: {value}')
-        return value
-
-    # Now, apply this to all parameters before passing them
-    inputs, solutions = load_mazes(
-        dataset=ensure_single_value(params.dataset_name, 'dataset_name'),
-        maze_size=ensure_single_value(params.maze_size, 'maze_size'),
-        num_mazes=ensure_single_value(params.num_mazes, 'num_mazes'),
-        gen=ensure_single_value(params.generation_method, 'generation_method'),
-        percolation=ensure_single_value(params.percolation, 'percolation'),
-        deadend_start=ensure_single_value(params.deadend_start, 'deadend_start'),
-    )
+    inputs, solutions = load_mazes(params)
 
     solutions = solutions.long()  # Convert to long for CrossEntropyLoss
     dataset: TensorDataset = TensorDataset(inputs, solutions)

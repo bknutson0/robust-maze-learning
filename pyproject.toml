@@ -49,6 +49,8 @@ dev = [
 		"ANN",    # flake8-annotations: check for type hints
 		"S",      # flake8-bandit: test for security
 		#"FIX002", # flake8-fixme: check for TODO
+		#"PGH003",  # pygrep-hooks: check for 'type: ignore' comments
+		#"PGH004"  # pygrep-hooks: check for 'noqa' comments
 	]
 	ignore = [
 		"D100",      # pydocstyle: ignore missing public module docstring
