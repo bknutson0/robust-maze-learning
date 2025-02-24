@@ -12,7 +12,7 @@ dependencies = [
     "numpy==1.26.4",
     "torch>=2.6.0",
     "scipy>=1.15.1",
-    "maze-dataset",
+    "maze-dataset", #TODO: specify version
 ]
 
 [dependency-groups]
@@ -49,7 +49,7 @@ dev = [
 		"ANN",    # flake8-annotations: check for type hints
 		"S",      # flake8-bandit: test for security
 		#"FIX002", # flake8-fixme: check for TODO
-		#"PGH003",  # pygrep-hooks: check for 'type: ignore' comments
+		#"PGH003", # pygrep-hooks: check for 'type: ignore' comments
 		#"PGH004"  # pygrep-hooks: check for 'noqa' comments
 	]
 	ignore = [
@@ -73,4 +73,5 @@ dev = [
 	cache_dir = ".mypy_cache"
 
 [tool.uv.sources]
-	maze-dataset = { git = "https://github.com/bknutson0/maze-dataset", branch = "improve-maze-generation" }
+	maze-dataset = { git = "https://github.com/understanding-search/maze-dataset", branch = "dev" } # TODO: switch to pypi
+	# maze-dataset = { path = "../maze-dataset" }

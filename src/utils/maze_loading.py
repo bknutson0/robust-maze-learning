@@ -1,14 +1,15 @@
 import logging
 import warnings
-from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
+import muutils
 import torch
 from maze_dataset import set_serialize_minimal_threshold
 from maze_dataset.dataset import MazeDataset, MazeDatasetConfig
 from maze_dataset.dataset.rasterized import RasterizedMazeDataset
 from maze_dataset.generation import LatticeMazeGenerators
+from muutils.mlutils import set_reproducibility
 from torch.utils.data import DataLoader, Dataset, TensorDataset
 
 from src.utils.config import DEVICE, LOGGING_LEVEL, Hyperparameters, TestParameters
@@ -56,7 +57,7 @@ def _load_mazes(params: Hyperparameters | TestParameters) -> tuple[torch.Tensor,
         'except_on_no_valid_endpoint': False,
     }
 
-    base_dataset: MazeDataset = MazeDataset.from_config(  # type: ignore
+    base_dataset: MazeDataset = MazeDataset.from_config(
         MazeDatasetConfig(  # type: ignore
             name=f'test-{params.seed}',
             grid_n=grid_n,
@@ -78,13 +79,13 @@ def _load_mazes(params: Hyperparameters | TestParameters) -> tuple[torch.Tensor,
         },
     )
 
-    # If no mazes were generated, attempt twice as many mazes, unless num_mazes is too large
-    if len(base_dataset) == 0:  # type: ignore
-        if params.num_mazes > 10**9:  # type: ignore
-            raise ValueError(f'Failed to generate any mazes with {params.num_mazes = }')
-        else:
-            new_params = replace(params, num_mazes=params.num_mazes * 2)  # type: ignore
-            return _load_mazes(new_params)
+    # # If no mazes were generated, attempt twice as many mazes, unless num_mazes is too large
+    # if len(base_dataset) == 0:
+    #     if params.num_mazes > 10**9:  # type: ignore
+    #         raise ValueError(f'Failed to generate any mazes with {params.num_mazes = }')
+    #     else:
+    #         new_params = replace(params, num_mazes=params.num_mazes * 2)  # type: ignore
+    #         return _load_mazes(new_params)
 
     # Convert to tensor
     dataset = dataset.get_batch(idxs=None)  # type: ignore
@@ -108,22 +109,30 @@ def _load_mazes(params: Hyperparameters | TestParameters) -> tuple[torch.Tensor,
 def load_mazes(params: Hyperparameters | TestParameters) -> tuple[torch.Tensor, torch.Tensor]:
     """Generate mazes of the given size and number, from the given dataset, and load to device."""
     if params.dataset_name == 'maze-dataset':
+        print(f'{muutils.mlutils.DEFAULT_SEED = }')
+        print(f'{muutils.mlutils.GLOBAL_SEED = }')
+        print(f'{params.seed = }')
+        muutils.mlutils.DEFAULT_SEED = params.seed
+        set_reproducibility(params.seed)
+        print(f'{muutils.mlutils.DEFAULT_SEED = }')
+        print(f'{muutils.mlutils.GLOBAL_SEED = }')
+
         inputs, solutions = _load_mazes(params)
 
-        # Generate more mazes if necessary
-        new_params = replace(params, num_mazes=params.num_mazes * 2)  # type: ignore
-        while len(inputs) < params.num_mazes:  # type: ignore
-            # Attempt twice as many mazes
-            new_params = replace(params, seed=new_params.seed + 1, num_mazes=new_params.num_mazes * 2)  # type: ignore
-            new_inputs, new_solutions = _load_mazes(new_params)
+        # # Generate more mazes if necessary
+        # new_params = replace(params, num_mazes=params.num_mazes * 2)  # type: ignore
+        # while len(inputs) < params.num_mazes:  # type: ignore
+        #     # Attempt twice as many mazes
+        #     new_params = replace(params, seed=new_params.seed + 1, num_mazes=new_params.num_mazes * 2)  # type: ignore
+        #     new_inputs, new_solutions = _load_mazes(new_params)
 
-            # Add new mazes to existing mazes
-            inputs = torch.cat([inputs, new_inputs], dim=0)
-            solutions = torch.cat([solutions, new_solutions], dim=0)
+        #     # Add new mazes to existing mazes
+        #     inputs = torch.cat([inputs, new_inputs], dim=0)
+        #     solutions = torch.cat([solutions, new_solutions], dim=0)
 
-        # Reduce number of mazes if necessary
-        inputs = inputs[: params.num_mazes]  # type: ignore
-        solutions = solutions[: params.num_mazes]  # type: ignore
+        # # Reduce number of mazes if necessary
+        # inputs = inputs[: params.num_mazes]  # type: ignore
+        # solutions = solutions[: params.num_mazes]  # type: ignore
 
     elif params.dataset_name == 'easy-to-hard-data':
         raise NotImplementedError('Easy-to-hard-data not implemented yet.')
