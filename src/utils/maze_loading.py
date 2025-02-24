@@ -109,13 +109,9 @@ def _load_mazes(params: Hyperparameters | TestParameters) -> tuple[torch.Tensor,
 def load_mazes(params: Hyperparameters | TestParameters) -> tuple[torch.Tensor, torch.Tensor]:
     """Generate mazes of the given size and number, from the given dataset, and load to device."""
     if params.dataset_name == 'maze-dataset':
-        print(f'{muutils.mlutils.DEFAULT_SEED = }')
-        print(f'{muutils.mlutils.GLOBAL_SEED = }')
-        print(f'{params.seed = }')
+        # Set maze-dataset seed
         muutils.mlutils.DEFAULT_SEED = params.seed
         set_reproducibility(params.seed)
-        print(f'{muutils.mlutils.DEFAULT_SEED = }')
-        print(f'{muutils.mlutils.GLOBAL_SEED = }')
 
         inputs, solutions = _load_mazes(params)
 
@@ -150,7 +146,7 @@ def load_mazes(params: Hyperparameters | TestParameters) -> tuple[torch.Tensor, 
         # solutions = maze_dataset.targets[:num_mazes].float().detach().to(DEVICE, dtype=torch.float32)
 
     logger.info(
-        f'Loaded {params.num_mazes} mazes with size: {params.maze_size}, percolation: {params.percolation}, '
+        f'Loaded {inputs.shape[0]} mazes with size: {params.maze_size}, percolation: {params.percolation}, '
         f'and deadend_start: {params.deadend_start}'
     )
 
