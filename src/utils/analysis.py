@@ -1,5 +1,6 @@
 from typing import Any
 
+import torch
 import matplotlib.cm as cm
 import matplotlib.colors as mcolors
 import matplotlib.pyplot as plt
@@ -103,7 +104,7 @@ def plot_test_accuracies(test_name: str, plot_type: str, filters: dict[str, Any]
         # plt.tight_layout()
 
         # Save the plot
-        plt.savefig(f'outputs/tests/{test_name}/acc_vs_perc.png', bbox_inches='tight')
+        plt.savefig(f'outputs/tests/{test_name}/acc_vs_perc.pdf', bbox_inches='tight')
         plt.close()
 
     # Plot heatmap of test accuracy versus maze size and test percolation for each model
@@ -168,8 +169,17 @@ def plot_test_accuracies(test_name: str, plot_type: str, filters: dict[str, Any]
         ax.invert_yaxis()
 
         # Save the plot
-        plt.savefig(f'outputs/tests/{test_name}/acc_vs_size_perc.png', bbox_inches='tight')
+        plt.savefig(f'outputs/tests/{test_name}/acc_vs_size_perc.pdf', bbox_inches='tight')
         plt.close()
+
+
+def plot__mazes(
+    inputs: torch.Tensor | None = None,
+    solutions: torch.Tensor | None = None,
+    predictions: torch.Tensor | None = None
+    file_name: str = 'outputs/visuals/mazes/mazes.pdf',
+) -> None:
+
 
 
 def plot_predictions(test_name: str, correct: bool | None = None) -> None:
