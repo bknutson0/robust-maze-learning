@@ -1,5 +1,4 @@
 import logging
-import warnings
 from pathlib import Path
 from typing import Any
 
@@ -14,9 +13,6 @@ from torch.utils.data import DataLoader, Dataset, TensorDataset
 
 from src.utils.config import DEVICE, LOGGING_LEVEL, Hyperparameters, TestParameters
 
-# Ignore warnings from muutils.json_serialize TODO: remove this line
-warnings.filterwarnings('ignore', module='muutils.json_serialize')
-
 # Create logger
 logging.basicConfig(
     level=getattr(logging, LOGGING_LEVEL, logging.INFO),  # Default to INFO if LOGGING_LEVEL is invalid
@@ -28,20 +24,28 @@ logger = logging.getLogger(__name__)
 set_serialize_minimal_threshold(int(10**7))
 
 
-def _load_mazes(params: Hyperparameters | TestParameters) -> tuple[torch.Tensor, torch.Tensor]:
+def _load_mazes(
+    params: Hyperparameters | TestParameters, num_mazes_attempt: int | None = None
+) -> tuple[torch.Tensor, torch.Tensor]:
     """Generate at least num_mazes mazes, recursively doubling the number of mazes attempted if none are generated."""
+    # Initially, attempt to generate exactly the desired number of mazes
+    if num_mazes_attempt is None:
+        num_mazes_attempt = params.num_mazes  # type: ignore
+
     logger.info(
-        f'Generating {params.num_mazes} mazes with size: {params.maze_size}, percolation: {params.percolation}, '
+        f'Attempting {num_mazes_attempt} mazes to generate {params.num_mazes} mazes with size: {params.maze_size}, '
+        f'percolation: {params.percolation}, '
         f'and deadend_start: {params.deadend_start}'
     )
 
+    # Check parameters
     if params.dataset_name != 'maze-dataset':
         raise NotImplementedError('Only maze-dataset is currently implemented.')
     if params.maze_size % 2 == 0:  # type: ignore
         raise ValueError(f'Expected odd maze size, got {params.maze_size}.')
     grid_n = (params.maze_size + 1) // 2  # type: ignore
 
-    # Generate base maze dataset
+    # Create maze dataset configuration
     if params.generation_method == 'dfs':
         maze_ctor = LatticeMazeGenerators.gen_dfs
         maze_ctor_kwargs = {}
@@ -56,17 +60,22 @@ def _load_mazes(params: Hyperparameters | TestParameters) -> tuple[torch.Tensor,
         'endpoints_not_equal': True,
         'except_on_no_valid_endpoint': False,
     }
+    cfg_original = MazeDatasetConfig(  # type: ignore
+        name=f'test-{params.seed}',
+        grid_n=grid_n,
+        n_mazes=num_mazes_attempt,
+        seed=params.seed,
+        maze_ctor=maze_ctor,
+        maze_ctor_kwargs=maze_ctor_kwargs,
+        endpoint_kwargs=endpoint_kwargs,
+    )
+
+    # Create base maze dataset from configuration
+    # cfg_new = cfg_original.success_fraction_compensate(safety_margin=1.2, epsilon=0.00001)
+    cfg_new = cfg_original
 
     base_dataset: MazeDataset = MazeDataset.from_config(
-        MazeDatasetConfig(  # type: ignore
-            name=f'test-{params.seed}',
-            grid_n=grid_n,
-            n_mazes=params.num_mazes,
-            seed=params.seed,
-            maze_ctor=maze_ctor,
-            maze_ctor_kwargs=maze_ctor_kwargs,
-            endpoint_kwargs=endpoint_kwargs,
-        ),
+        cfg_new,
         local_base_path=Path('data/maze-dataset/'),
     )
 
@@ -79,31 +88,36 @@ def _load_mazes(params: Hyperparameters | TestParameters) -> tuple[torch.Tensor,
         },
     )
 
-    # # If no mazes were generated, attempt twice as many mazes, unless num_mazes is too large
-    # if len(base_dataset) == 0:
-    #     if params.num_mazes > 10**9:  # type: ignore
-    #         raise ValueError(f'Failed to generate any mazes with {params.num_mazes = }')
-    #     else:
-    #         new_params = replace(params, num_mazes=params.num_mazes * 2)  # type: ignore
-    #         return _load_mazes(new_params)
+    # If not enough mazes were generated, attempt with between 2 and num_mazes_attempt times as many mazes
+    if len(base_dataset) < params.num_mazes:  # type: ignore
+        if params.num_mazes > 10**9:  # type: ignore
+            raise ValueError(f'Failed to generate any mazes after attempting with {params.num_mazes = }')
+        else:
+            num_mazes_result = len(base_dataset)
+            new_num_mazes_attempt_1 = num_mazes_attempt // max(num_mazes_result, 1) * params.num_mazes  # type: ignore
+            new_num_mazes_attempt_2 = 2 * num_mazes_attempt  # type: ignore
+            new_num_mazes_attempt = max(new_num_mazes_attempt_1, new_num_mazes_attempt_2)
+            return _load_mazes(params, new_num_mazes_attempt)  # type: ignore
 
-    # Convert to tensor
-    dataset = dataset.get_batch(idxs=None)  # type: ignore
+    # Otherwise return the desired number of mazes
+    else:
+        # Convert to tensor
+        dataset = dataset.get_batch(idxs=None)  # type: ignore
 
-    # Get inputs
-    inputs = dataset[0, :, :, :]
-    inputs = inputs / 255.0
-    inputs = inputs.permute(0, 3, 1, 2)
-    inputs = inputs.float().detach().to(DEVICE, dtype=torch.float32)
+        # Get inputs
+        inputs = dataset[0, 0 : params.num_mazes, :, :]  # type: ignore
+        inputs = inputs / 255.0
+        inputs = inputs.permute(0, 3, 1, 2)
+        inputs = inputs.float().detach().to(DEVICE, dtype=torch.float32)
 
-    # Get solutions
-    solutions = dataset[1, :, :, :]
-    solutions = solutions / 255.0
-    solutions = solutions.permute(0, 3, 1, 2)
-    solutions, _ = torch.max(solutions, dim=1)
-    solutions = solutions.float().detach().to(DEVICE, dtype=torch.float32)
+        # Get solutions
+        solutions = dataset[1, 0 : params.num_mazes, :, :]  # type: ignore
+        solutions = solutions / 255.0
+        solutions = solutions.permute(0, 3, 1, 2)
+        solutions, _ = torch.max(solutions, dim=1)
+        solutions = solutions.float().detach().to(DEVICE, dtype=torch.float32)
 
-    return inputs, solutions
+        return inputs, solutions
 
 
 def load_mazes(params: Hyperparameters | TestParameters) -> tuple[torch.Tensor, torch.Tensor]:
