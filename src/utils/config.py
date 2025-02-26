@@ -29,7 +29,7 @@ class Hyperparameters:
     """Hyperparameters for training the model."""
 
     # General parameters
-    seed: int = 0
+    seed: int = 1
 
     # Dataset parameters
     dataset_name: str = 'maze-dataset'
@@ -71,7 +71,7 @@ class TestParameters:
     """Parameters for testing the model."""
 
     # General parameters
-    seed: int = 1  # Different seed from training
+    seed: int = 4242  # Different seed from training
 
     # Dataset parameters
     dataset_name: list[str] | str = field(default_factory=lambda: ['maze-dataset'])

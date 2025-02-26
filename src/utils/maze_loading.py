@@ -129,20 +129,12 @@ def load_mazes(params: Hyperparameters | TestParameters) -> tuple[torch.Tensor, 
 
         inputs, solutions = _load_mazes(params)
 
-        # # Generate more mazes if necessary
-        # new_params = replace(params, num_mazes=params.num_mazes * 2)  # type: ignore
-        # while len(inputs) < params.num_mazes:  # type: ignore
-        #     # Attempt twice as many mazes
-        #     new_params = replace(params, seed=new_params.seed + 1, num_mazes=new_params.num_mazes * 2)  # type: ignore
-        #     new_inputs, new_solutions = _load_mazes(new_params)
+        logger.info(
+            f'Loaded {inputs.shape[0]} mazes with size: {params.maze_size}, percolation: {params.percolation}, '
+            f'and deadend_start: {params.deadend_start}'
+        )
 
-        #     # Add new mazes to existing mazes
-        #     inputs = torch.cat([inputs, new_inputs], dim=0)
-        #     solutions = torch.cat([solutions, new_solutions], dim=0)
-
-        # # Reduce number of mazes if necessary
-        # inputs = inputs[: params.num_mazes]  # type: ignore
-        # solutions = solutions[: params.num_mazes]  # type: ignore
+        return inputs, solutions
 
     elif params.dataset_name == 'easy-to-hard-data':
         raise NotImplementedError('Easy-to-hard-data not implemented yet.')
@@ -158,13 +150,7 @@ def load_mazes(params: Hyperparameters | TestParameters) -> tuple[torch.Tensor, 
         # maze_dataset = EasyToHardMazeDataset(root='data/easy-to-hard-data/', train=False, size=maze_size)
         # inputs = maze_dataset.inputs[:num_mazes].float().detach().to(DEVICE, dtype=torch.float32)
         # solutions = maze_dataset.targets[:num_mazes].float().detach().to(DEVICE, dtype=torch.float32)
-
-    logger.info(
-        f'Loaded {inputs.shape[0]} mazes with size: {params.maze_size}, percolation: {params.percolation}, '
-        f'and deadend_start: {params.deadend_start}'
-    )
-
-    return inputs, solutions
+    return torch.tensor([]), torch.tensor([])
 
 
 def maze_loaders(

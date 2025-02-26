@@ -1,11 +1,12 @@
+import os
 from typing import Any
 
-import torch
 import matplotlib.cm as cm
 import matplotlib.colors as mcolors
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+import torch
 
 
 def plot_test_accuracies(test_name: str, plot_type: str, filters: dict[str, Any] | None = None) -> None:
@@ -173,13 +174,57 @@ def plot_test_accuracies(test_name: str, plot_type: str, filters: dict[str, Any]
         plt.close()
 
 
-def plot__mazes(
+def plot_mazes(
     inputs: torch.Tensor | None = None,
     solutions: torch.Tensor | None = None,
-    predictions: torch.Tensor | None = None
-    file_name: str = 'outputs/visuals/mazes/mazes.pdf',
+    predictions: torch.Tensor | None = None,
+    file_name: str = 'outputs/visuals/mazes/mazes',
 ) -> None:
+    """Plot mazes inputs, solutions, and/or predictions, batched or not, and save the plot to a file."""
+    if all(x is None for x in [inputs, solutions, predictions]):
+        raise ValueError('At least one of inputs, solutions, or predictions must be provided.')
 
+    # Ensure valid batch size
+    for tensor, name in zip([inputs, solutions, predictions], ['Inputs', 'Solutions', 'Predictions'], strict=False):
+        if tensor is not None and tensor.size(0) == 0:
+            raise ValueError(f'{name} tensor has zero batch size.')
+
+    # Ensure tensors have batch dimension
+    if inputs is not None and inputs.dim() == 3:
+        inputs = inputs.unsqueeze(0)
+    if solutions is not None and solutions.dim() == 2:
+        solutions = solutions.unsqueeze(0)
+    if predictions is not None and predictions.dim() == 2:
+        predictions = predictions.unsqueeze(0)
+
+    batch_size = max(x.size(0) if x is not None else 0 for x in [inputs, solutions, predictions])
+
+    # Filter out None values
+    mazes = [
+        (maze, title)
+        for maze, title in zip([inputs, solutions, predictions], ['Inputs', 'Solutions', 'Predictions'], strict=False)
+        if maze is not None
+    ]
+    num_cols = len(mazes)
+
+    # Create figure with proper spacing
+    fig, axes = plt.subplots(batch_size, num_cols, figsize=(3.5 * num_cols, 3.5 * batch_size), dpi=300, squeeze=False)
+
+    for row in range(batch_size):
+        for col, (maze, title) in enumerate(mazes):
+            ax = axes[row, col] if batch_size > 1 else axes[col]  # Ensure correct indexing
+            ax.imshow(
+                maze[row].permute(1, 2, 0).cpu().numpy() if title == 'Inputs' else maze[row].cpu().numpy(), cmap='gray'
+            )
+            ax.set_title(title, fontsize=12, pad=10)  # Ensure titles appear
+            ax.axis('off')
+
+    plt.subplots_adjust(wspace=0.1, hspace=0.2)  # Increase space between subplots
+
+    # Save the plot
+    os.makedirs(os.path.dirname(file_name), exist_ok=True)
+    plt.savefig(f'{file_name}.pdf', bbox_inches='tight')
+    plt.close()
 
 
 def plot_predictions(test_name: str, correct: bool | None = None) -> None:
