@@ -41,7 +41,6 @@ class Hyperparameters:
 
     # Model hyperparameters
     model_name: str = 'dt_net'
-    pretrained: bool = True
     iters: int = 30
 
     # Training parameters
@@ -50,13 +49,16 @@ class Hyperparameters:
     batch_size: int = 32
     epochs: int = 100
     checkpoint_freq: int = 10
-    alpha: float = 0.01  # Progressive loss factor, originally 0.01 in "End-to-end algorithm synthesis"
     learning_rate: float = 0.0001
     grad_clip: float | None = 1.0
     optimizer_name: str = 'AdamW'
     learning_rate_scheduler_name: str = 'ReduceLROnPlateau'
     patience: int = 10
     reduction_factor: float = 0.1
+
+    # dt_net specific
+    pretrained: bool = True
+    alpha: float = 0.01  # Progressive loss factor, originally 0.01 in "End-to-end algorithm synthesis"
 
     def to_json(self, path: str) -> None:
         """Save hyperparameters to JSON file."""

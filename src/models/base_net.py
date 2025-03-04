@@ -1,6 +1,9 @@
 from abc import ABC, abstractmethod
 
 import torch
+from torch.utils.tensorboard.writer import SummaryWriter
+
+from src.utils.config import Hyperparameters
 
 
 class BaseNet(torch.nn.Module, ABC):
@@ -40,6 +43,20 @@ class BaseNet(torch.nn.Module, ABC):
         self, outputs: torch.Tensor | list[torch.Tensor], inputs: torch.Tensor, grad: bool = False
     ) -> torch.Tensor | list[torch.Tensor]:
         """Compute the predictions from the outputs."""
+        pass
+
+    @abstractmethod
+    def train_step(
+        self,
+        inputs: torch.Tensor,
+        solutions: torch.Tensor,
+        hyperparams: Hyperparameters,
+        criterion: torch.nn.Module,
+        optimizer: torch.optim.Optimizer,
+        frac_epoch: float,
+        writer: SummaryWriter | None = None,
+    ) -> float:
+        """Perform a training step."""
         pass
 
     def predict(

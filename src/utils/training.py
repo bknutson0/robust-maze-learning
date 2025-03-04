@@ -43,58 +43,7 @@ def train_epoch(
     for batch_idx, (inputs, solutions) in enumerate(train_loader):
         optimizer.zero_grad()
         frac_epoch = epoch + batch_idx / len(train_loader)
-
-        # Compute standard loss "loss_iters"
-        latents_initial = model.input_to_latent(inputs, grad=True)
-        latents = model.latent_forward(latents_initial, inputs, iters=hyperparams.iters, grad=True)
-        outputs = model.latent_to_output(latents, grad=True)
-
-        torch.use_deterministic_algorithms(False)
-        loss_iters = criterion(outputs, solutions).mean()
-        torch.use_deterministic_algorithms(True)
-
-        # Compute progressive loss "loss_prog"
-        loss_prog = 0.0
-        if hyperparams.alpha > 0:
-            # Sample n ~ U{0, iters - 1}
-            n = int(torch.randint(0, hyperparams.iters, (1,)).item())
-            # Sample k ~ U{1, iters - n}
-            k = int(torch.randint(1, int(hyperparams.iters - n), (1,)).item() if (hyperparams.iters - n) > 1 else 1)
-
-            # Iterate n times w/o gradient tracking
-            latents = model.latent_forward(latents_initial, inputs, iters=n, grad=False)
-
-            # Iterate k times with gradient tracking
-            latents = model.latent_forward(latents, inputs, iters=k, grad=True)  # type: ignore
-
-            # Compute progressive loss
-            outputs = model.latent_to_output(latents, grad=True)
-            torch.use_deterministic_algorithms(False)
-            loss_prog = criterion(outputs, solutions).mean()
-            torch.use_deterministic_algorithms(True)
-
-        # Compute loss gradient
-        loss = (1 - hyperparams.alpha) * loss_iters + hyperparams.alpha * loss_prog
-        loss.backward()
-        if hyperparams.grad_clip is not None:
-            torch.nn.utils.clip_grad_norm_(model.parameters(), hyperparams.grad_clip)
-
-        # Update model parameters
-        optimizer.step()
-
-        # Log metrics
-        if writer is not None:
-            writer.add_scalar('loss/train_batch', loss.item(), int(frac_epoch * 100))
-            output_norm = torch.norm(outputs).item()
-            writer.add_scalar('output_norm/train_batch', output_norm, int(frac_epoch * 100))
-            latent_norm = torch.norm(latents).item()
-            writer.add_scalar('latent_norm/train_batch', latent_norm, int(frac_epoch * 100))
-            grad_norm = torch.norm(
-                torch.cat([p.grad.view(-1) for p in model.parameters() if p.grad is not None])
-            ).item()
-            writer.add_scalar('grad_norm/train_batch', grad_norm, int(frac_epoch * 100))
-            weight_norm = torch.norm(torch.cat([p.view(-1) for p in model.parameters()])).item()
-            writer.add_scalar('weight_norm/train_batch', weight_norm, int(frac_epoch * 100))
+        model.train_step(inputs, solutions, hyperparams, criterion, optimizer, frac_epoch, writer)
 
     # Compute training loss for the epoch, analogous to validation loss
     # Select random subset of training data with same size as validation data

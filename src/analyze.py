@@ -5,7 +5,7 @@ from src.utils.analysis import plot_test_accuracies
 
 def main() -> None:
     """Analyze test results."""
-    test_name = '2025-03-02_21:40:11'
+    test_name = '2025-03-04_12:26:21'
 
     df = pd.read_csv(f'outputs/tests/{test_name}/results.csv')
     print(df.head(20))
