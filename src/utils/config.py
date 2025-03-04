@@ -90,9 +90,12 @@ class TestParameters:
     # Testing parameters
     batch_size: int = 256
 
-    def are_single_valued(self) -> bool:
-        """Check if all parameters are single-valued."""
-        return all(isinstance(value, bool | int | float | str) for value in asdict(self).values())
+    def are_mostly_single_valued(self) -> bool:
+        """Check if all parameters are single-valued, except model_name and iters."""
+        return all(
+            (isinstance(value, bool | int | float | str) or key in ['model_name', 'iters'])
+            for key, value in asdict(self).items()
+        )
 
     def to_json(self, path: str) -> None:
         """Save test parameters to JSON file."""

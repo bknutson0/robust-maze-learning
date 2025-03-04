@@ -64,7 +64,7 @@ class DTNet(BaseNet, DTNetOriginal):
             return outputs
 
     def output_to_prediction(
-        self, outputs: torch.Tensor, inputs: torch.Tensor, grad: bool = False, masked: bool = True
+        self, outputs: torch.Tensor | list[torch.Tensor], inputs: torch.Tensor, grad: bool = False, masked: bool = True
     ) -> torch.Tensor:
         """Compute the predictions from the outputs."""
         if isinstance(outputs, list):

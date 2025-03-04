@@ -157,7 +157,7 @@ def maze_loaders(
     params: Hyperparameters | TestParameters,
 ) -> tuple[DataLoader[Any], DataLoader[Any], DataLoader[Any]] | DataLoader[Any]:
     """Load the maze dataset and return data loaders for training and validation, or testing."""
-    if isinstance(params, TestParameters) and not params.are_single_valued():
+    if isinstance(params, TestParameters) and not params.are_mostly_single_valued():
         raise ValueError('TestParameters must have a single value for each parameter.')
 
     inputs, solutions = load_mazes(params)

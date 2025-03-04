@@ -1,3 +1,5 @@
+"""Based on https://github.com/aks2203/deep-thinking/blob/main/deepthinking/models/dt_net_2d.py ."""
+
 import torch
 import torch.nn.functional as func
 from torch import Tensor, nn
