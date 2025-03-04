@@ -26,7 +26,7 @@ class ResBlock(nn.Module):
 
 
 class ITNet(BaseNet):
-    """Implicit Temporal Network (ITNet) - Solves for u iteratively"""
+    """Implicit variation of DeepThinking Network 2D model class."""
     def __init__(self, in_channels=3, hidden_dim=64, num_layers=4, time_steps=10):
         super().__init__()
         self.in_channels = in_channels
