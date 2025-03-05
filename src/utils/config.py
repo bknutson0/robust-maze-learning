@@ -57,7 +57,7 @@ class Hyperparameters:
     reduction_factor: float = 0.1
 
     # dt_net specific
-    pretrained: bool = True
+    pretrained: bool = False
     alpha: float = 0.01  # Progressive loss factor, originally 0.01 in "End-to-end algorithm synthesis"
 
     def to_json(self, path: str) -> None:
