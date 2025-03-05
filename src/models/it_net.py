@@ -46,7 +46,7 @@ class ITNet(BaseNet):
         )
         self.latent_forward_layer = nn.Sequential(
             nn.Conv2d(latent_dim + in_channels, latent_dim, kernel_size=3, stride=1, padding=1, bias=False),
-            nn.ModuleList([BasicBlock(latent_dim, latent_dim) for _ in range(num_blocks)]),
+            *[BasicBlock(latent_dim, latent_dim) for _ in range(num_blocks)],
         )
         self.latent_to_output_layer = nn.Sequential(
             nn.Conv2d(latent_dim, 32, kernel_size=3, padding=1, bias=False),

@@ -44,6 +44,7 @@ class Hyperparameters:
     iters: int = 30
 
     # Training parameters
+    pretrained: bool = False
     validation_size: float = 0.1
     train_size: float = 1.0 - validation_size
     batch_size: int = 32
@@ -57,7 +58,6 @@ class Hyperparameters:
     reduction_factor: float = 0.1
 
     # dt_net specific
-    pretrained: bool = False
     alpha: float = 0.01  # Progressive loss factor, originally 0.01 in "End-to-end algorithm synthesis"
 
     # it_net specific

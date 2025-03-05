@@ -6,6 +6,7 @@ import torch
 
 from src.models.base_net import BaseNet
 from src.models.dt_net import DTNet
+from src.models.it_net import ITNet
 from src.utils.config import DEVICE, LOGGING_LEVEL, Hyperparameters
 
 # Create logger
@@ -40,9 +41,7 @@ def load_model(model_name: str, pretrained: bool = True) -> BaseNet:
         #     model = PINet(width=cfg.problem.model.width, in_channels=3, config=cfg)
         #     state_dict = torch.load(model_path, map_location=device, weights_only=True)['net']
     elif model_name == 'it_net':
-        raise NotImplementedError('ITNet model not implemented yet')
-        # model = ITNet()
-        # state_dict = torch.load('models/it_net.pth', map_location=DEVICE, weights_only=True)['net']
+        model = ITNet()
     else:
         raise ValueError(f'Unknown model name: {model_name}')
 
@@ -58,7 +57,7 @@ def load_model(model_name: str, pretrained: bool = True) -> BaseNet:
         elif model_name == 'pi_net':
             raise NotImplementedError('PINet model not implemented yet')
         elif model_name == 'it_net':
-            raise NotImplementedError('ITNet model not implemented yet')
+            state_dict = torch.load('models/it_net/original.pth', map_location=DEVICE, weights_only=True)['net']
         else:
             state_dict = torch.load(model_name, map_location=DEVICE, weights_only=True)
 
