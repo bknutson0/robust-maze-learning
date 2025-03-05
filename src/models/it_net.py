@@ -1,13 +1,16 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as f
+from torch.utils.tensorboard.writer import SummaryWriter
 
 from src.models.base_net import BaseNet
+from src.utils.config import Hyperparameters
 
 
-class ResBlock(nn.Module):
+class BasicBlock(nn.Module):
     """Standard residual block with two convolutions (3x3 kernel) and a skip connection."""
-    def __init__(self, in_channels: int, out_channels: int, stride: int=1) -> None:
+
+    def __init__(self, in_channels: int, out_channels: int, stride: int = 1) -> None:
         """Initialize the block."""
         super().__init__()
         self.conv1 = nn.Conv2d(in_channels, out_channels, kernel_size=3, stride=stride, padding=1, bias=False)
@@ -27,63 +30,123 @@ class ResBlock(nn.Module):
 
 class ITNet(BaseNet):
     """Implicit variation of DeepThinking Network 2D model class."""
-    def __init__(self, in_channels=3, hidden_dim=64, num_layers=4, time_steps=10):
+
+    def __init__(self, in_channels: int = 3, latent_dim: int = 128, num_blocks: int = 4, out_channels: int = 2) -> None:
+        """Initialize the model."""
         super().__init__()
+        self.name = 'it_net'
         self.in_channels = in_channels
-        self.hidden_dim = hidden_dim
-        self.num_layers = num_layers
-        self.time_steps = time_steps
-        self.name = "it_net"
+        self.latent_dim = latent_dim
+        self.num_blocks = num_blocks
+        self.out_channels = out_channels
 
-        # Initial Injection Layer
-        self.recur_inj = nn.Conv2d(2 * in_channels, hidden_dim, kernel_size=3, padding=1, bias=False)
-
-        # Residual Blocks for Iterative Updates
-        self.layers = nn.ModuleList([ResBlock(hidden_dim, hidden_dim) for _ in range(num_layers)])
-
-        # Final Output Mapping
-        self.output_head = nn.Sequential(
-            nn.Conv2d(hidden_dim, 32, kernel_size=3, padding=1, bias=False),
+        # Define three main layers
+        self.input_to_latent_layer = nn.Sequential(
+            nn.Conv2d(in_channels, latent_dim, kernel_size=3, stride=1, padding=1, bias=False), nn.ReLU()
+        )
+        self.latent_forward_layer = nn.Sequential(
+            nn.Conv2d(latent_dim + in_channels, latent_dim, kernel_size=3, stride=1, padding=1, bias=False),
+            nn.ModuleList([BasicBlock(latent_dim, latent_dim) for _ in range(num_blocks)]),
+        )
+        self.latent_to_output_layer = nn.Sequential(
+            nn.Conv2d(latent_dim, 32, kernel_size=3, padding=1, bias=False),
             nn.ReLU(),
             nn.Conv2d(32, 8, kernel_size=3, padding=1, bias=False),
             nn.ReLU(),
-            nn.Conv2d(8, in_channels, kernel_size=3, padding=1, bias=False),
+            nn.Conv2d(8, out_channels, kernel_size=3, padding=1, bias=False),
         )
 
-    def forward(self, u, x):
-        """One iterative step in the implicit process"""
-        u = self.recur_inj(torch.cat([u, x], dim=1))  # Concatenate inputs
-        for layer in self.layers:
-            u = layer(u)  # Apply residual blocks
-        return self.output_head(u)  # Final mapping
-
     def input_to_latent(self, inputs: torch.Tensor, grad: bool = False) -> torch.Tensor:
-        """Initialize the latent state from inputs."""
-        return inputs.detach().requires_grad_(grad) if grad else inputs.clone()
-
-    def latent_forward(self, latents: torch.Tensor, inputs: torch.Tensor, iters=1, grad=False):
-        """Iteratively solve for the latent representation."""
-        if isinstance(iters, int):
-            iters = [iters]
-
-        outputs = []
-        u = latents
-        with torch.set_grad_enabled(grad):
-            for _ in range(max(iters) - 1):
-                u = self.forward(u, inputs)  # Iterative update
-                if _ + 1 in iters:
-                    outputs.append(u.clone())
-
-        u = u.detach().requires_grad_(grad)
-        u = self.forward(u, inputs)
-        outputs.append(u)
-
-        return outputs if len(outputs) > 1 else outputs[0]
-
-    def latent_to_output(self, latents, grad=False):
-        """Directly return the latent representation as output."""
+        """Compute the latent representation from the inputs."""
+        latents: torch.Tensor
+        with torch.no_grad() if not grad else torch.enable_grad():
+            latents = self.input_to_latent_layer(inputs)
         return latents
 
-    def output_to_prediction(self, outputs, inputs, grad=False):
-        """Convert outputs to predictions (identity in this case)."""
-        return outputs
+    def latent_forward(
+        self, latents: torch.Tensor, inputs: torch.Tensor, iters: int | list[int] = 1, grad: bool = False
+    ) -> torch.Tensor | list[torch.Tensor]:
+        """Perform the forward pass in the latent space."""
+        # Ensure iters is always a sorted list
+        iters = [iters] if isinstance(iters, int) else sorted(iters)
+        latents_list = []
+
+        if 0 in iters:
+            index_of_last_0_iter = iters[::-1].index(0)
+            for _ in range(index_of_last_0_iter + 1):
+                latents_list.append(latents)
+
+        # Perform the forward pass for max iterations, saving at specified iterations
+        with torch.no_grad() if not grad else torch.enable_grad():
+            for i in range(1, iters[-1] + 1):
+                latents = self.latent_forward_layer(torch.cat([latents, inputs], dim=1))
+                if i in iters:
+                    latents_list.append(latents)
+
+        # Return the first element if only one iteration is specified
+        if len(iters) == 1:
+            return latents_list[0]
+        else:
+            return latents_list
+
+    def latent_to_output(
+        self, latents: torch.Tensor | list[torch.Tensor], grad: bool = False
+    ) -> torch.Tensor | list[torch.Tensor]:
+        """Compute the output from the latent."""
+        if isinstance(latents, list):
+            return [self.latent_to_output(latent, grad) for latent in latents]  # type: ignore
+        else:
+            outputs: torch.Tensor
+            with torch.no_grad() if not grad else torch.enable_grad():
+                outputs = self.latent_to_output_layer(latents)
+            return outputs
+
+    def train_step(
+        self,
+        inputs: torch.Tensor,
+        solutions: torch.Tensor,
+        hyperparams: Hyperparameters,
+        criterion: torch.nn.Module,
+        optimizer: torch.optim.Optimizer,
+        frac_epoch: float,
+        writer: SummaryWriter | None = None,
+    ) -> float:
+        """Perform a single training step."""
+        self.train()
+        optimizer.zero_grad()
+
+        # Compute output while tracking gradients, possibly with Jacobian-free backpropagation
+        latents_initial = self.input_to_latent(inputs, grad=True)
+        if hyperparams.train_jfb:
+            latents = self.latent_forward(latents_initial, inputs, iters=hyperparams.iters - 1, grad=False)
+            latents = self.latent_forward(latents_initial, inputs, iters=1, grad=True)
+        else:
+            latents = self.latent_forward(latents_initial, inputs, iters=hyperparams.iters, grad=True)
+        outputs = self.latent_to_output(latents, grad=True)
+
+        # Compute loss
+        torch.use_deterministic_algorithms(False)
+        loss = criterion(outputs, solutions).mean()
+        torch.use_deterministic_algorithms(True)
+
+        # Compute loss gradient
+        loss.backward()
+        if hyperparams.grad_clip is not None:
+            torch.nn.utils.clip_grad_norm_(self.parameters(), hyperparams.grad_clip)
+
+        # Update model parameters
+        optimizer.step()
+
+        # Log metrics
+        if writer is not None:
+            writer.add_scalar('loss/train_batch', loss.item(), int(frac_epoch * 100))
+            output_norm = torch.norm(outputs).item()
+            writer.add_scalar('output_norm/train_batch', output_norm, int(frac_epoch * 100))
+            latent_norm = torch.norm(latents).item()
+            writer.add_scalar('latent_norm/train_batch', latent_norm, int(frac_epoch * 100))
+            grad_norm = torch.norm(torch.cat([p.grad.view(-1) for p in self.parameters() if p.grad is not None])).item()
+            writer.add_scalar('grad_norm/train_batch', grad_norm, int(frac_epoch * 100))
+            weight_norm = torch.norm(torch.cat([p.view(-1) for p in self.parameters()])).item()
+            writer.add_scalar('weight_norm/train_batch', weight_norm, int(frac_epoch * 100))
+
+        return float(loss.item())

@@ -38,12 +38,33 @@ class BaseNet(torch.nn.Module, ABC):
         """Compute the output from the latent."""
         pass
 
-    @abstractmethod
     def output_to_prediction(
-        self, outputs: torch.Tensor | list[torch.Tensor], inputs: torch.Tensor, grad: bool = False
-    ) -> torch.Tensor | list[torch.Tensor]:
+        self, outputs: torch.Tensor | list[torch.Tensor], inputs: torch.Tensor, grad: bool = False, masked: bool = True
+    ) -> torch.Tensor:
         """Compute the predictions from the outputs."""
-        pass
+        if isinstance(outputs, list):
+            return [self.output_to_prediction(output, inputs, grad, masked) for output in outputs]  # type: ignore
+        else:
+            predictions: torch.Tensor
+            with torch.no_grad() if not grad else torch.enable_grad():
+                if outputs.dim() == 3:
+                    unmasked_predictions = torch.argmax(outputs, dim=0)
+                    if masked:
+                        mask, _ = torch.max(inputs, dim=0)
+                        predictions = unmasked_predictions * mask
+                    else:
+                        predictions = unmasked_predictions
+                    return predictions
+                if outputs.dim() == 4:
+                    unmasked_predictions = torch.argmax(outputs, dim=1)
+                    if masked:
+                        mask, _ = torch.max(inputs, dim=1)
+                        predictions = unmasked_predictions * mask
+                    else:
+                        predictions = unmasked_predictions
+                    return predictions
+                else:
+                    raise ValueError(f'Invalid outputs dimension {outputs.dim()}, expected 3 or 4.')
 
     @abstractmethod
     def train_step(

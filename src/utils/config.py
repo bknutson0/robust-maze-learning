@@ -60,6 +60,9 @@ class Hyperparameters:
     pretrained: bool = False
     alpha: float = 0.01  # Progressive loss factor, originally 0.01 in "End-to-end algorithm synthesis"
 
+    # it_net specific
+    train_jfb: bool = False  # Train using Jacobian-free backpropagation
+
     def to_json(self, path: str) -> None:
         """Save hyperparameters to JSON file."""
         os.makedirs(os.path.dirname(path), exist_ok=True)

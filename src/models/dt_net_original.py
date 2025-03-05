@@ -45,7 +45,7 @@ class DTNetOriginal(nn.Module):
     def __init__(
         self,
         block: type[BasicBlock] = BasicBlock,
-        num_blocks: list[int] | None = None,
+        num_blocks: list[int] | None =None,
         width: int = 128,
         in_channels: int = 3,
         recall: bool = True,

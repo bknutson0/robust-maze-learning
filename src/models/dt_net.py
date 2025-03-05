@@ -57,7 +57,7 @@ class DTNet(BaseNet, DTNetOriginal):
     ) -> torch.Tensor | list[torch.Tensor]:
         """Compute the output from the latent."""
         if isinstance(latents, list):
-            return [self.latent_to_output(latent, grad) for latent in latents] # type: ignore
+            return [self.latent_to_output(latent, grad) for latent in latents]  # type: ignore
         else:
             outputs: torch.Tensor
             with torch.no_grad() if not grad else torch.enable_grad():
@@ -66,34 +66,6 @@ class DTNet(BaseNet, DTNetOriginal):
                 else:
                     raise ValueError(f'Invalid latents dimension {latents.dim()}, expected 3 or 4.')
             return outputs
-
-    def output_to_prediction(
-        self, outputs: torch.Tensor | list[torch.Tensor], inputs: torch.Tensor, grad: bool = False, masked: bool = True
-    ) -> torch.Tensor:
-        """Compute the predictions from the outputs."""
-        if isinstance(outputs, list):
-            return [self.output_to_prediction(output, inputs, grad, masked) for output in outputs] # type: ignore
-        else:
-            predictions: torch.Tensor
-            with torch.no_grad() if not grad else torch.enable_grad():
-                if outputs.dim() == 3:
-                    unmasked_predictions = torch.argmax(outputs, dim=0)
-                    if masked:
-                        mask, _ = torch.max(inputs, dim=0)
-                        predictions = unmasked_predictions * mask
-                    else:
-                        predictions = unmasked_predictions
-                    return predictions
-                if outputs.dim() == 4:
-                    unmasked_predictions = torch.argmax(outputs, dim=1)
-                    if masked:
-                        mask, _ = torch.max(inputs, dim=1)
-                        predictions = unmasked_predictions * mask
-                    else:
-                        predictions = unmasked_predictions
-                    return predictions
-                else:
-                    raise ValueError(f'Invalid outputs dimension {outputs.dim()}, expected 3 or 4.')
 
     def train_step(
         self,
@@ -154,9 +126,7 @@ class DTNet(BaseNet, DTNetOriginal):
             writer.add_scalar('output_norm/train_batch', output_norm, int(frac_epoch * 100))
             latent_norm = torch.norm(latents).item()
             writer.add_scalar('latent_norm/train_batch', latent_norm, int(frac_epoch * 100))
-            grad_norm = torch.norm(
-                torch.cat([p.grad.view(-1) for p in self.parameters() if p.grad is not None])
-            ).item()
+            grad_norm = torch.norm(torch.cat([p.grad.view(-1) for p in self.parameters() if p.grad is not None])).item()
             writer.add_scalar('grad_norm/train_batch', grad_norm, int(frac_epoch * 100))
             weight_norm = torch.norm(torch.cat([p.view(-1) for p in self.parameters()])).item()
             writer.add_scalar('weight_norm/train_batch', weight_norm, int(frac_epoch * 100))
