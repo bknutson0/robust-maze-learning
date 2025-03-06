@@ -6,7 +6,7 @@ import torch
 
 # Device configuration
 # Prioritize PREFERRED_CUDA > CUDA > MPS > CPU
-PREFERRED_CUDA = 0
+PREFERRED_CUDA = 1
 DEVICE = None
 if torch.cuda.is_available():
     if torch.cuda.device_count() > PREFERRED_CUDA:

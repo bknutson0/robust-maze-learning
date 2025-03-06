@@ -57,7 +57,7 @@ def load_model(model_name: str, pretrained: bool = True) -> BaseNet:
         elif model_name == 'pi_net':
             raise NotImplementedError('PINet model not implemented yet')
         elif model_name == 'it_net':
-            state_dict = torch.load('models/it_net/original.pth', map_location=DEVICE, weights_only=True)['net']
+            state_dict = torch.load('models/it_net/epoch_10.pth', map_location=DEVICE, weights_only=True)
         else:
             state_dict = torch.load(model_name, map_location=DEVICE, weights_only=True)
 

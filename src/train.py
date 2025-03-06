@@ -6,8 +6,11 @@ def main() -> None:
     """Train the model for different percolation values."""
     # Define hyperparameters
     hyperparams = Hyperparameters()
+    hyperparams.epochs = 90
     hyperparams.model_name = 'it_net'
-    hyperparams.train_jfb = False
+    hyperparams.pretrained = True
+    hyperparams.train_jfb = True
+    hyperparams.num_mazes = 1000
 
     # Define percolation values for fine-tuning
     # percolations = [0.000, 0.001, 0.003]  # job:1
