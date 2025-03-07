@@ -87,7 +87,7 @@ def compute_average_loss_and_accuracy(
 
             # Compute corrects
             predictions = model.output_to_prediction(outputs, inputs, grad=False)
-            corrects = is_minimal_path(inputs, predictions, solutions)  # type: ignore
+            corrects = is_minimal_path(inputs, predictions, solutions)
             total_correct += int(corrects.sum().item())
             total_samples += inputs.size(0)
 

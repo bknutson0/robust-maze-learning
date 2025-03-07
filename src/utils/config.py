@@ -61,7 +61,8 @@ class Hyperparameters:
     alpha: float = 0.01  # Progressive loss factor, originally 0.01 in "End-to-end algorithm synthesis"
 
     # it_net specific
-    train_jfb: bool = False  # Train using Jacobian-free backpropagation
+    train_jfb: bool = False  # Train using Jacobian-free backpropagation (JFB)
+    warmup: int = 0  # Epochs to train without JFB initially
 
     def to_json(self, path: str) -> None:
         """Save hyperparameters to JSON file."""

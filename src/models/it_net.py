@@ -115,13 +115,18 @@ class ITNet(BaseNet):
         self.train()
         optimizer.zero_grad()
 
-        # Compute output while tracking gradients, possibly with Jacobian-free backpropagation
+        # Compute outputs, possibly with Jacobian-free backpropagation
         latents_initial = self.input_to_latent(inputs, grad=True)
-        if hyperparams.train_jfb:
-            latents = self.latent_forward(latents_initial, inputs, iters=hyperparams.iters - 1, grad=False)
-            latents = self.latent_forward(latents_initial, inputs, iters=1, grad=True)
+        if hyperparams.train_jfb and frac_epoch >= hyperparams.warmup:
+            # Iterate without tracking gradients (this detaches the computational graph)
+            latents_no_grad = self.latent_forward(latents_initial, inputs, iters=hyperparams.iters - 1, grad=False)
+
+            # Retain latents values resulting from iteration and copy the computational graph of latents_initial
+            latents = latents_initial + (latents_no_grad - latents_initial).detach()
+
+            latents = self.latent_forward(latents_initial, inputs, iters=1, grad=True)  # type: ignore
         else:
-            latents = self.latent_forward(latents_initial, inputs, iters=hyperparams.iters, grad=True)
+            latents = self.latent_forward(latents_initial, inputs, iters=hyperparams.iters, grad=True)  # type: ignore
         outputs = self.latent_to_output(latents, grad=True)
 
         # Compute loss
