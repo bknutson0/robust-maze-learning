@@ -16,18 +16,16 @@ class DTNet(BaseNet, DTNetOriginal):
 
     def __init__(self) -> None:
         """Initialize the model."""
-        BaseNet.__init__(self)
-        DTNetOriginal.__init__(self)
+        super().__init__()
+        self.name = 'dt_net'
 
-    def input_to_latent(self, inputs: torch.Tensor, grad: bool = False) -> torch.Tensor:
+    def input_to_latent(self, inputs: torch.Tensor) -> torch.Tensor:
         """Compute the latent representation from the inputs."""
-        latents: torch.Tensor
-        with torch.no_grad() if not grad else torch.enable_grad():
-            latents = self.projection(inputs)
+        latents: torch.Tensor = self.projection(inputs)
         return latents
 
     def latent_forward(
-        self, latents: torch.Tensor, inputs: torch.Tensor, iters: int | list[int] = 1, grad: bool = False
+        self, latents: torch.Tensor, inputs: torch.Tensor, iters: int | list[int] = 1
     ) -> torch.Tensor | list[torch.Tensor]:
         """Perform the forward pass in the latent space."""
         # Ensure iters is always a sorted list
@@ -40,11 +38,10 @@ class DTNet(BaseNet, DTNetOriginal):
                 latents_list.append(latents)
 
         # Perform the forward pass for max iterations, saving at specified iterations
-        with torch.no_grad() if not grad else torch.enable_grad():
-            for i in range(1, iters[-1] + 1):
-                latents = self.recur_block(torch.cat([latents, inputs], dim=1))
-                if i in iters:
-                    latents_list.append(latents)
+        for i in range(1, iters[-1] + 1):
+            latents = self.recur_block(torch.cat([latents, inputs], dim=1))
+            if i in iters:
+                latents_list.append(latents)
 
         # Return the first element if only one iteration is specified
         if len(iters) == 1:
@@ -52,19 +49,16 @@ class DTNet(BaseNet, DTNetOriginal):
         else:
             return latents_list
 
-    def latent_to_output(
-        self, latents: torch.Tensor | list[torch.Tensor], grad: bool = False
-    ) -> torch.Tensor | list[torch.Tensor]:
+    def latent_to_output(self, latents: torch.Tensor | list[torch.Tensor]) -> torch.Tensor | list[torch.Tensor]:
         """Compute the output from the latent."""
         if isinstance(latents, list):
-            return [self.latent_to_output(latent, grad) for latent in latents]  # type: ignore
+            return [self.latent_to_output(latent) for latent in latents]  # type: ignore
         else:
             outputs: torch.Tensor
-            with torch.no_grad() if not grad else torch.enable_grad():
-                if latents.dim() in {3, 4}:
-                    outputs = self.head(latents)
-                else:
-                    raise ValueError(f'Invalid latents dimension {latents.dim()}, expected 3 or 4.')
+            if latents.dim() in {3, 4}:
+                outputs = self.head(latents)
+            else:
+                raise ValueError(f'Invalid latents dimension {latents.dim()}, expected 3 or 4.')
             return outputs
 
     def train_step(
@@ -82,9 +76,9 @@ class DTNet(BaseNet, DTNetOriginal):
         optimizer.zero_grad()
 
         # Compute standard loss "loss_iters"
-        latents_initial = self.input_to_latent(inputs, grad=True)
-        latents = self.latent_forward(latents_initial, inputs, iters=hyperparams.iters, grad=True)
-        outputs = self.latent_to_output(latents, grad=True)
+        latents_initial = self.input_to_latent(inputs)
+        latents = self.latent_forward(latents_initial, inputs, iters=hyperparams.iters)
+        outputs = self.latent_to_output(latents)
 
         torch.use_deterministic_algorithms(False)
         loss_iters = criterion(outputs, solutions).mean()
@@ -99,13 +93,15 @@ class DTNet(BaseNet, DTNetOriginal):
             k = int(torch.randint(1, int(hyperparams.iters - n), (1,)).item() if (hyperparams.iters - n) > 1 else 1)
 
             # Iterate n times w/o gradient tracking
-            latents = self.latent_forward(latents_initial, inputs, iters=n, grad=False)
+            with torch.no_grad():
+                latents = self.latent_forward(latents_initial, inputs, iters=n)
 
             # Iterate k times with gradient tracking
-            latents = self.latent_forward(latents, inputs, iters=k, grad=True)  # type: ignore
+            latents = (latents - latents_initial).detach() + latents_initial  # Copy latents_initial computation graph
+            latents = self.latent_forward(latents, inputs, iters=k)
 
             # Compute progressive loss
-            outputs = self.latent_to_output(latents, grad=True)
+            outputs = self.latent_to_output(latents)
             torch.use_deterministic_algorithms(False)
             loss_prog = criterion(outputs, solutions).mean()
             torch.use_deterministic_algorithms(True)

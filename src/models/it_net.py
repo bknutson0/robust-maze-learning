@@ -115,19 +115,71 @@ class ITNet(BaseNet):
         self.train()
         optimizer.zero_grad()
 
-        # Compute outputs, possibly with Jacobian-free backpropagation
         latents_initial = self.input_to_latent(inputs, grad=True)
-        if hyperparams.train_jfb and frac_epoch >= hyperparams.warmup:
-            # Iterate without tracking gradients (this detaches the computational graph)
-            latents_no_grad = self.latent_forward(latents_initial, inputs, iters=hyperparams.iters - 1, grad=False)
+        latents = latents_initial.detach()
 
-            # Retain latents values resulting from iteration and copy the computational graph of latents_initial
-            latents = latents_initial + (latents_no_grad - latents_initial).detach()
+        # Track normed differences and convergence of each batch element, w/o tracking gradients
+        diff_norm = torch.full((latents.size(0),), float('inf'))
+        converged = torch.zeros_like(diff_norm, dtype=torch.bool)
 
-            latents = self.latent_forward(latents_initial, inputs, iters=1, grad=True)  # type: ignore
-        else:
-            latents = self.latent_forward(latents_initial, inputs, iters=hyperparams.iters, grad=True)  # type: ignore
+        with torch.no_grad():
+            for i in range(hyperparams.iters - 2):
+                latents_prev = latents.clone()
+
+                # Only update elements that haven't converged
+                if not converged.all():
+                    latents_new = self.latent_forward(
+                        latents_initial[~converged], inputs[~converged], iters=1, grad=False
+                    )
+
+                    # Update only unconverged latents
+                    latents[~converged] = latents_new  # type: ignore
+
+                    # Compute norm differences for unconverged elements across all dimensions except batch dimension
+                    diff_norm[~converged] = torch.norm(
+                        latents[~converged] - latents_prev[~converged], dim=tuple(range(1, latents.dim()))
+                    )
+
+                    # Update convergence status
+                    converged |= diff_norm < hyperparams.tolerance
+
+                else:
+                    break
+
+        # Final iteration with gradient tracking
+        latents = latents_initial + (latents - latents_initial).detach().requires_grad_()
+        latents = self.latent_forward(latents, inputs, iters=1, grad=True)
+
         outputs = self.latent_to_output(latents, grad=True)
+
+        # # Iterate without tracking gradients (and detach computational graph) until convergence
+        # if hyperparams.train_jfb and frac_epoch >= hyperparams.warmup:
+        #     # Only track gradient for final iteration
+        #     latents = latents_initial.detach()
+        #     diff_norm = float('inf')
+
+        #     # Iterate one less than maximum, but stop early if converged within tolerance
+        #     for i in range(hyperparams.iters - 2):
+        #         latents_prev = latents.detach()
+        #         latents = self.latent_forward(latents_initial, inputs, iters=1, grad=False)
+        #         diff_norm = torch.norm(latents - latents_prev).item()
+        #         if diff_norm < hyperparams.tolerance:
+        #             break
+
+        #     # Iterate final time with gradient tracking
+        #     latents = latents_initial + (latents - latents_initial).detach().requires_grad_()
+        #     latents = self.latent_forward(latents, inputs, iters=1, grad=True)
+
+        # else:
+        #     # Track gradient for all iterations
+        #     # Iterate maximum times, but stop early if converged within tolerance
+        #     for i in range(hyperparams.iters - 2):
+        #         latents_prev = latents.detach()
+        #         latents = self.latent_forward(latents_initial, inputs, iters=1, grad=True)
+        #         diff_norm = torch.norm(latents - latents_prev).item()
+        #         if diff_norm < hyperparams.tolerance:
+        #             break
+        # outputs = self.latent_to_output(latents, grad=True)
 
         # Compute loss
         torch.use_deterministic_algorithms(False)

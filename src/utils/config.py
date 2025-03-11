@@ -6,7 +6,7 @@ import torch
 
 # Device configuration
 # Prioritize PREFERRED_CUDA > CUDA > MPS > CPU
-PREFERRED_CUDA = 1
+PREFERRED_CUDA = 2
 DEVICE = None
 if torch.cuda.is_available():
     if torch.cuda.device_count() > PREFERRED_CUDA:
@@ -61,6 +61,7 @@ class Hyperparameters:
     alpha: float = 0.01  # Progressive loss factor, originally 0.01 in "End-to-end algorithm synthesis"
 
     # it_net specific
+    tolerance: float = 1e-6  # Tolerance for convergence
     train_jfb: bool = False  # Train using Jacobian-free backpropagation (JFB)
     warmup: int = 0  # Epochs to train without JFB initially
 

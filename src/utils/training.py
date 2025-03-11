@@ -77,16 +77,16 @@ def compute_average_loss_and_accuracy(
     with torch.no_grad():
         for inputs, solutions in loader:
             # Compute loss
-            latents = model.input_to_latent(inputs, grad=False)
-            latents = model.latent_forward(latents, inputs, iters=hyperparams.iters, grad=False)  # type: ignore
-            outputs = model.latent_to_output(latents, grad=False)
+            latents = model.input_to_latent(inputs)
+            latents = model.latent_forward(latents, inputs, iters=hyperparams.iters)  # type: ignore
+            outputs = model.latent_to_output(latents)
             torch.use_deterministic_algorithms(False)
             loss = criterion(outputs, solutions).mean()
             torch.use_deterministic_algorithms(True)
             total_loss += loss.item()
 
             # Compute corrects
-            predictions = model.output_to_prediction(outputs, inputs, grad=False)
+            predictions = model.output_to_prediction(outputs, inputs)
             corrects = is_minimal_path(inputs, predictions, solutions)
             total_correct += int(corrects.sum().item())
             total_samples += inputs.size(0)
