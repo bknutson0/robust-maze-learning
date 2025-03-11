@@ -193,7 +193,7 @@ def train(hyperparams: Hyperparameters) -> float:
             torch.save(model.state_dict(), checkpoint_file)
 
     # Save total training time
-    results['total_training_time'] = time.strftime('%Hh %Mm %Ss', time.gmtime(current_time))
+    results['total_train_time'] = time.strftime('%Hh %Mm %Ss', time.gmtime(current_time))
     with open(os.path.join(run_dir, 'results.json'), 'w') as f:
         json.dump(results, f, indent=4)
 

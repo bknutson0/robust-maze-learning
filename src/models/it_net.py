@@ -56,15 +56,13 @@ class ITNet(BaseNet):
             nn.Conv2d(8, out_channels, kernel_size=3, padding=1, bias=False),
         )
 
-    def input_to_latent(self, inputs: torch.Tensor, grad: bool = False) -> torch.Tensor:
+    def input_to_latent(self, inputs: torch.Tensor) -> torch.Tensor:
         """Compute the latent representation from the inputs."""
-        latents: torch.Tensor
-        with torch.no_grad() if not grad else torch.enable_grad():
-            latents = self.input_to_latent_layer(inputs)
+        latents: torch.Tensor = self.input_to_latent_layer(inputs)
         return latents
 
     def latent_forward(
-        self, latents: torch.Tensor, inputs: torch.Tensor, iters: int | list[int] = 1, grad: bool = False
+        self, latents: torch.Tensor, inputs: torch.Tensor, iters: int | list[int] = 1
     ) -> torch.Tensor | list[torch.Tensor]:
         """Perform the forward pass in the latent space."""
         # Ensure iters is always a sorted list
@@ -77,11 +75,10 @@ class ITNet(BaseNet):
                 latents_list.append(latents)
 
         # Perform the forward pass for max iterations, saving at specified iterations
-        with torch.no_grad() if not grad else torch.enable_grad():
-            for i in range(1, iters[-1] + 1):
-                latents = self.latent_forward_layer(torch.cat([latents, inputs], dim=1))
-                if i in iters:
-                    latents_list.append(latents)
+        for i in range(1, iters[-1] + 1):
+            latents = self.latent_forward_layer(torch.cat([latents, inputs], dim=1))
+            if i in iters:
+                latents_list.append(latents)
 
         # Return the first element if only one iteration is specified
         if len(iters) == 1:
@@ -89,16 +86,12 @@ class ITNet(BaseNet):
         else:
             return latents_list
 
-    def latent_to_output(
-        self, latents: torch.Tensor | list[torch.Tensor], grad: bool = False
-    ) -> torch.Tensor | list[torch.Tensor]:
+    def latent_to_output(self, latents: torch.Tensor | list[torch.Tensor]) -> torch.Tensor | list[torch.Tensor]:
         """Compute the output from the latent."""
         if isinstance(latents, list):
-            return [self.latent_to_output(latent, grad) for latent in latents]  # type: ignore
+            return [self.latent_to_output(latent) for latent in latents]  # type: ignore
         else:
-            outputs: torch.Tensor
-            with torch.no_grad() if not grad else torch.enable_grad():
-                outputs = self.latent_to_output_layer(latents)
+            outputs: torch.Tensor = self.latent_to_output_layer(latents)
             return outputs
 
     def train_step(
