@@ -108,95 +108,70 @@ class ITNet(BaseNet):
         self.train()
         optimizer.zero_grad()
 
-        latents_initial = self.input_to_latent(inputs, grad=True)
-        latents = latents_initial.detach()
+        # Initial latent representation
+        latents_initial = self.input_to_latent(inputs)
+        latents = latents_initial
 
-        # Track normed differences and convergence of each batch element, w/o tracking gradients
+        # Initialize tracking variables for norm differences, convergence, and iterations
         diff_norm = torch.full((latents.size(0),), float('inf'))
         converged = torch.zeros_like(diff_norm, dtype=torch.bool)
+        iterations = torch.zeros_like(diff_norm, dtype=torch.int32)
 
-        with torch.no_grad():
+        # Iterative update loop with optional gradient tracking
+        with torch.no_grad() if (hyperparams.train_jfb and frac_epoch >= hyperparams.warmup) else torch.enable_grad():
             for i in range(hyperparams.iters - 2):
                 latents_prev = latents.clone()
 
-                # Only update elements that haven't converged
                 if not converged.all():
-                    latents_new = self.latent_forward(
-                        latents_initial[~converged], inputs[~converged], iters=1, grad=False
-                    )
-
                     # Update only unconverged latents
-                    latents[~converged] = latents_new  # type: ignore
+                    latents[~converged] = self.latent_forward(latents_initial[~converged], inputs[~converged], iters=1)  # type: ignore
 
                     # Compute norm differences for unconverged elements across all dimensions except batch dimension
                     diff_norm[~converged] = torch.norm(
                         latents[~converged] - latents_prev[~converged], dim=tuple(range(1, latents.dim()))
-                    )
+                    ).detach()
 
-                    # Update convergence status
-                    converged |= diff_norm < hyperparams.tolerance
-
+                    # Mark newly converged elements and record iteration counts
+                    converged_now = diff_norm < hyperparams.tolerance
+                    iterations[~converged & converged_now] = i + 1
+                    converged |= converged_now
                 else:
                     break
 
         # Final iteration with gradient tracking
         latents = latents_initial + (latents - latents_initial).detach().requires_grad_()
-        latents = self.latent_forward(latents, inputs, iters=1, grad=True)
+        latents = self.latent_forward(latents, inputs, iters=1)  # type: ignore
 
-        outputs = self.latent_to_output(latents, grad=True)
+        # Compute outputs from final latents
+        outputs = self.latent_to_output(latents)
 
-        # # Iterate without tracking gradients (and detach computational graph) until convergence
-        # if hyperparams.train_jfb and frac_epoch >= hyperparams.warmup:
-        #     # Only track gradient for final iteration
-        #     latents = latents_initial.detach()
-        #     diff_norm = float('inf')
-
-        #     # Iterate one less than maximum, but stop early if converged within tolerance
-        #     for i in range(hyperparams.iters - 2):
-        #         latents_prev = latents.detach()
-        #         latents = self.latent_forward(latents_initial, inputs, iters=1, grad=False)
-        #         diff_norm = torch.norm(latents - latents_prev).item()
-        #         if diff_norm < hyperparams.tolerance:
-        #             break
-
-        #     # Iterate final time with gradient tracking
-        #     latents = latents_initial + (latents - latents_initial).detach().requires_grad_()
-        #     latents = self.latent_forward(latents, inputs, iters=1, grad=True)
-
-        # else:
-        #     # Track gradient for all iterations
-        #     # Iterate maximum times, but stop early if converged within tolerance
-        #     for i in range(hyperparams.iters - 2):
-        #         latents_prev = latents.detach()
-        #         latents = self.latent_forward(latents_initial, inputs, iters=1, grad=True)
-        #         diff_norm = torch.norm(latents - latents_prev).item()
-        #         if diff_norm < hyperparams.tolerance:
-        #             break
-        # outputs = self.latent_to_output(latents, grad=True)
-
-        # Compute loss
+        # Compute loss with deterministic algorithms disabled for performance
         torch.use_deterministic_algorithms(False)
         loss = criterion(outputs, solutions).mean()
         torch.use_deterministic_algorithms(True)
 
-        # Compute loss gradient
+        # Backpropagation and gradient clipping (if enabled)
         loss.backward()
         if hyperparams.grad_clip is not None:
             torch.nn.utils.clip_grad_norm_(self.parameters(), hyperparams.grad_clip)
 
-        # Update model parameters
+        # Optimizer step to update model parameters
         optimizer.step()
 
-        # Log metrics
+        # Log metrics to TensorBoard if a writer is provided
         if writer is not None:
             writer.add_scalar('loss/train_batch', loss.item(), int(frac_epoch * 100))
-            output_norm = torch.norm(outputs).item()
-            writer.add_scalar('output_norm/train_batch', output_norm, int(frac_epoch * 100))
-            latent_norm = torch.norm(latents).item()
-            writer.add_scalar('latent_norm/train_batch', latent_norm, int(frac_epoch * 100))
+            writer.add_scalar('output_norm/train_batch', torch.norm(outputs).item(), int(frac_epoch * 100))
+            writer.add_scalar('latent_norm/train_batch', torch.norm(latents).item(), int(frac_epoch * 100))
             grad_norm = torch.norm(torch.cat([p.grad.view(-1) for p in self.parameters() if p.grad is not None])).item()
             writer.add_scalar('grad_norm/train_batch', grad_norm, int(frac_epoch * 100))
             weight_norm = torch.norm(torch.cat([p.view(-1) for p in self.parameters()])).item()
             writer.add_scalar('weight_norm/train_batch', weight_norm, int(frac_epoch * 100))
+
+            # Log iteration and norm difference statistics
+            writer.add_scalar('iterations/mean', iterations.float().mean().item(), int(frac_epoch * 100))
+            writer.add_scalar('iterations/max', iterations.max().item(), int(frac_epoch * 100))
+            writer.add_scalar('diff_norm/final_mean', diff_norm.mean().item(), int(frac_epoch * 100))
+            writer.add_scalar('diff_norm/final_max', diff_norm.max().item(), int(frac_epoch * 100))
 
         return float(loss.item())
