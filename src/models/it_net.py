@@ -62,29 +62,53 @@ class ITNet(BaseNet):
         return latents
 
     def latent_forward(
-        self, latents: torch.Tensor, inputs: torch.Tensor, iters: int | list[int] = 1
+        self,
+        latents: torch.Tensor,
+        inputs: torch.Tensor,
+        iters: int | list[int] = 1,
+        tolerance: float = 1e-6,
+        return_extra: bool = False,
     ) -> torch.Tensor | list[torch.Tensor]:
         """Perform the forward pass in the latent space."""
         # Ensure iters is always a sorted list
         iters = [iters] if isinstance(iters, int) else sorted(iters)
+
+        # Initial latent representation
+        latents_initial = latents.clone()
+        latents = latents_initial
         latents_list = []
 
-        if 0 in iters:
-            index_of_last_0_iter = iters[::-1].index(0)
-            for _ in range(index_of_last_0_iter + 1):
+        # Initialize tracking variables for norm differences, convergence, and iterations
+        diff_norm = torch.full((latents.size(0),), float('inf'), device=latents.device)
+        converged = torch.zeros_like(diff_norm, dtype=torch.bool, device=latents.device)
+        iterations = torch.zeros_like(diff_norm, dtype=torch.int32, device=latents.device)
+
+        for i in range(iters[-1]):
+            print(f'Iterating {i + 1}/{iters[-1]} with {converged.sum()} converged')
+
+            latents_prev = latents.clone()
+
+            if not converged.all():
+                # Update unconverged latents and iteration counts
+                latents[~converged] = self.latent_forward_layer(
+                    torch.cat([latents[~converged], inputs[~converged]], dim=1)
+                )
+                iterations[~converged] = i + 1
+
+                # Compute normed differences for previously unconverged latents
+                diff_norm[~converged] = torch.norm(
+                    latents[~converged] - latents_prev[~converged], p=2, dim=tuple(range(1, latents.dim()))
+                ).detach()
+
+                # Update convergence status
+                converged |= diff_norm < tolerance
+
+            # Save latent representation at specified iterations
+            if i + 1 in iters:
                 latents_list.append(latents)
 
-        # Perform the forward pass for max iterations, saving at specified iterations
-        for i in range(1, iters[-1] + 1):
-            latents = self.latent_forward_layer(torch.cat([latents, inputs], dim=1))
-            if i in iters:
-                latents_list.append(latents)
-
-        # Return the first element if only one iteration is specified
-        if len(iters) == 1:
-            return latents_list[0]
-        else:
-            return latents_list
+        latents_list = [latents_list] if len(iters) == 1 else latents_list  # type: ignore
+        return latents_list if not return_extra else latents_list, iterations, diff_norm  # type: ignore
 
     def latent_to_output(self, latents: torch.Tensor | list[torch.Tensor]) -> torch.Tensor | list[torch.Tensor]:
         """Compute the output from the latent."""
@@ -110,37 +134,16 @@ class ITNet(BaseNet):
 
         # Initial latent representation
         latents_initial = self.input_to_latent(inputs)
-        latents = latents_initial
-
-        # Initialize tracking variables for norm differences, convergence, and iterations
-        diff_norm = torch.full((latents.size(0),), float('inf'))
-        converged = torch.zeros_like(diff_norm, dtype=torch.bool)
-        iterations = torch.zeros_like(diff_norm, dtype=torch.int32)
 
         # Iterative update loop with optional gradient tracking
         with torch.no_grad() if (hyperparams.train_jfb and frac_epoch >= hyperparams.warmup) else torch.enable_grad():
-            for i in range(hyperparams.iters - 2):
-                latents_prev = latents.clone()
-
-                if not converged.all():
-                    # Update only unconverged latents
-                    latents[~converged] = self.latent_forward(latents_initial[~converged], inputs[~converged], iters=1)  # type: ignore
-
-                    # Compute norm differences for unconverged elements across all dimensions except batch dimension
-                    diff_norm[~converged] = torch.norm(
-                        latents[~converged] - latents_prev[~converged], dim=tuple(range(1, latents.dim()))
-                    ).detach()
-
-                    # Mark newly converged elements and record iteration counts
-                    converged_now = diff_norm < hyperparams.tolerance
-                    iterations[~converged & converged_now] = i + 1
-                    converged |= converged_now
-                else:
-                    break
+            latents, iterations, diff_norm = self.latent_forward(
+                latents_initial, inputs, iters=hyperparams.iters - 1, tolerance=hyperparams.tolerance, return_extra=True
+            )
 
         # Final iteration with gradient tracking
         latents = latents_initial + (latents - latents_initial).detach().requires_grad_()
-        latents = self.latent_forward(latents, inputs, iters=1)  # type: ignore
+        latents = self.latent_forward(latents, inputs, iters=1)
 
         # Compute outputs from final latents
         outputs = self.latent_to_output(latents)
@@ -160,6 +163,10 @@ class ITNet(BaseNet):
 
         # Log metrics to TensorBoard if a writer is provided
         if writer is not None:
+            writer.add_scalar('iterations/mean', iterations.mean().item(), int(frac_epoch * 100))
+            writer.add_scalar('iterations/max', iterations.max().item(), int(frac_epoch * 100))
+            writer.add_scalar('diff_norm/mean', diff_norm.mean().item(), int(frac_epoch * 100))
+            writer.add_scalar('diff_norm/max', diff_norm.max().item(), int(frac_epoch * 100))
             writer.add_scalar('loss/train_batch', loss.item(), int(frac_epoch * 100))
             writer.add_scalar('output_norm/train_batch', torch.norm(outputs).item(), int(frac_epoch * 100))
             writer.add_scalar('latent_norm/train_batch', torch.norm(latents).item(), int(frac_epoch * 100))
@@ -167,11 +174,5 @@ class ITNet(BaseNet):
             writer.add_scalar('grad_norm/train_batch', grad_norm, int(frac_epoch * 100))
             weight_norm = torch.norm(torch.cat([p.view(-1) for p in self.parameters()])).item()
             writer.add_scalar('weight_norm/train_batch', weight_norm, int(frac_epoch * 100))
-
-            # Log iteration and norm difference statistics
-            writer.add_scalar('iterations/mean', iterations.float().mean().item(), int(frac_epoch * 100))
-            writer.add_scalar('iterations/max', iterations.max().item(), int(frac_epoch * 100))
-            writer.add_scalar('diff_norm/final_mean', diff_norm.mean().item(), int(frac_epoch * 100))
-            writer.add_scalar('diff_norm/final_max', diff_norm.max().item(), int(frac_epoch * 100))
 
         return float(loss.item())
