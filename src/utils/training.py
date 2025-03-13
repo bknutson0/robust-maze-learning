@@ -78,7 +78,12 @@ def compute_average_loss_and_accuracy(
         for inputs, solutions in loader:
             # Compute loss
             latents = model.input_to_latent(inputs)
-            latents = model.latent_forward(latents, inputs, iters=hyperparams.iters)  # type: ignore
+            if model.name == 'it_net':
+                latents = model.latent_forward(
+                    latents, inputs, iters=hyperparams.iters, tolerance=hyperparams.tolerance
+                )  # type: ignore
+            else:  # model.name == 'base_net'
+                latents = model.latent_forward(latents, inputs, iters=hyperparams.iters)  # type: ignore
             outputs = model.latent_to_output(latents)
             torch.use_deterministic_algorithms(False)
             loss = criterion(outputs, solutions).mean()

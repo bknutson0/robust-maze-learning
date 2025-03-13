@@ -21,7 +21,7 @@ class BaseNet(torch.nn.Module, ABC):
 
     @abstractmethod
     def latent_forward(
-        self, latents: torch.Tensor, inputs: torch.Tensor, iters: int | list[int] = 1
+        self, latents: torch.Tensor, inputs: torch.Tensor, iters: int | list[int] = 1, tolerance: float | None = None
     ) -> torch.Tensor | list[torch.Tensor]:
         """Perform the forward pass in the latent space."""
         pass

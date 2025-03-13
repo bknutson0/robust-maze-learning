@@ -25,7 +25,7 @@ class DTNet(BaseNet, DTNetOriginal):
         return latents
 
     def latent_forward(
-        self, latents: torch.Tensor, inputs: torch.Tensor, iters: int | list[int] = 1
+        self, latents: torch.Tensor, inputs: torch.Tensor, iters: int | list[int] = 1, tolerance: float | None = None
     ) -> torch.Tensor | list[torch.Tensor]:
         """Perform the forward pass in the latent space."""
         # Ensure iters is always a sorted list

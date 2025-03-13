@@ -66,10 +66,12 @@ class ITNet(BaseNet):
         latents: torch.Tensor,
         inputs: torch.Tensor,
         iters: int | list[int] = 1,
-        tolerance: float = 1e-6,
+        tolerance: float | None = None,
         return_extra: bool = False,
     ) -> torch.Tensor | list[torch.Tensor]:
         """Perform the forward pass in the latent space."""
+        tolerance = tolerance if not None else Hyperparameters().tolerance
+
         # Ensure iters is always a sorted list
         iters = [iters] if isinstance(iters, int) else sorted(iters)
 
@@ -84,7 +86,7 @@ class ITNet(BaseNet):
         iterations = torch.zeros_like(diff_norm, dtype=torch.int32, device=latents.device)
 
         for i in range(iters[-1]):
-            print(f'Iterating {i + 1}/{iters[-1]} with {converged.sum()} converged')
+            # print(f'Iterating {i + 1}/{iters[-1]} with {converged.sum()} converged')
 
             latents_prev = latents.clone()
 
@@ -107,11 +109,16 @@ class ITNet(BaseNet):
             if i + 1 in iters:
                 latents_list.append(latents)
 
-        latents_list = [latents_list] if len(iters) == 1 else latents_list  # type: ignore
-        return latents_list if not return_extra else latents_list, iterations, diff_norm  # type: ignore
+        latents_list = latents_list[0] if len(iters) == 1 else latents_list  # type: ignore
+        if return_extra:
+            return latents_list, iterations, diff_norm  # type: ignore
+        else:
+            return latents_list
 
     def latent_to_output(self, latents: torch.Tensor | list[torch.Tensor]) -> torch.Tensor | list[torch.Tensor]:
         """Compute the output from the latent."""
+        print('latent_to_output: ', end='')
+        print(f'{latents.shape = }') if isinstance(latents, torch.Tensor) else print(f'{len(latents) = }')
         if isinstance(latents, list):
             return [self.latent_to_output(latent) for latent in latents]  # type: ignore
         else:
@@ -143,7 +150,7 @@ class ITNet(BaseNet):
 
         # Final iteration with gradient tracking
         latents = latents_initial + (latents - latents_initial).detach().requires_grad_()
-        latents = self.latent_forward(latents, inputs, iters=1)
+        latents = self.latent_forward_layer(torch.cat([latents, inputs], dim=1))
 
         # Compute outputs from final latents
         outputs = self.latent_to_output(latents)
@@ -163,7 +170,7 @@ class ITNet(BaseNet):
 
         # Log metrics to TensorBoard if a writer is provided
         if writer is not None:
-            writer.add_scalar('iterations/mean', iterations.mean().item(), int(frac_epoch * 100))
+            writer.add_scalar('iterations/mean', iterations.float().mean().item(), int(frac_epoch * 100))
             writer.add_scalar('iterations/max', iterations.max().item(), int(frac_epoch * 100))
             writer.add_scalar('diff_norm/mean', diff_norm.mean().item(), int(frac_epoch * 100))
             writer.add_scalar('diff_norm/max', diff_norm.max().item(), int(frac_epoch * 100))
