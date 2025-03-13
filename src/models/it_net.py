@@ -103,7 +103,7 @@ class ITNet(BaseNet):
                 ).detach()
 
                 # Update convergence status
-                converged |= diff_norm < tolerance
+                converged |= diff_norm < tolerance  # type: ignore
 
             # Save latent representation at specified iterations
             if i + 1 in iters:
