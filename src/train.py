@@ -10,11 +10,11 @@ def main() -> None:
     # Modifications for training it_net
     hyperparams.model_name = 'it_net'
     hyperparams.iters = 100
-    hyperparams.num_mazes = 30
+    #hyperparams.num_mazes = 10000
     hyperparams.warmup = 10
     hyperparams.train_jfb = True
     # hyperparams.learning_rate = 0.00001
-    hyperparams.batch_size = 10
+    hyperparams.batch_size = 32
 
     # Define percolation values for fine-tuning
     # percolations = [0.000, 0.001, 0.003, 0.01]  # job:1

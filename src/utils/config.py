@@ -6,7 +6,7 @@ import torch
 
 # Device configuration
 # Prioritize PREFERRED_CUDA > CUDA > MPS > CPU
-PREFERRED_CUDA = 0
+PREFERRED_CUDA = 2
 DEVICE = None
 if torch.cuda.is_available():
     if torch.cuda.device_count() > PREFERRED_CUDA:
@@ -21,6 +21,9 @@ else:
 
 # Logging configuration
 LOGGING_LEVEL = 'INFO'  # Set logging level globally
+
+# Parameters for training and testing the model
+TOLERANCE = 1e-6  # Tolerance for convergence in it_net
 
 
 # Training hyperparameters
@@ -96,6 +99,11 @@ class TestParameters:
 
     # Testing parameters
     batch_size: int = 256
+
+    # dt_net specific
+
+    # it_net specific
+    tolerance: float = TOLERANCE  # Tolerance for convergence
 
     def are_mostly_single_valued(self) -> bool:
         """Check if all parameters are single-valued, except model_name and iters."""

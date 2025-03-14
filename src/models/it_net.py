@@ -1,3 +1,5 @@
+from contextlib import nullcontext
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as f
@@ -117,8 +119,6 @@ class ITNet(BaseNet):
 
     def latent_to_output(self, latents: torch.Tensor | list[torch.Tensor]) -> torch.Tensor | list[torch.Tensor]:
         """Compute the output from the latent."""
-        print('latent_to_output: ', end='')
-        print(f'{latents.shape = }') if isinstance(latents, torch.Tensor) else print(f'{len(latents) = }')
         if isinstance(latents, list):
             return [self.latent_to_output(latent) for latent in latents]  # type: ignore
         else:
@@ -143,7 +143,7 @@ class ITNet(BaseNet):
         latents_initial = self.input_to_latent(inputs)
 
         # Iterative update loop with optional gradient tracking
-        with torch.no_grad() if (hyperparams.train_jfb and frac_epoch >= hyperparams.warmup) else torch.enable_grad():
+        with torch.no_grad() if (hyperparams.train_jfb and frac_epoch >= hyperparams.warmup) else nullcontext():
             latents, iterations, diff_norm = self.latent_forward(
                 latents_initial, inputs, iters=hyperparams.iters - 1, tolerance=hyperparams.tolerance, return_extra=True
             )
