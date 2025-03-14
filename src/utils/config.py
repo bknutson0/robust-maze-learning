@@ -66,7 +66,7 @@ class Hyperparameters:
     # it_net specific
     tolerance: float = 1e-6  # Tolerance for convergence
     train_jfb: bool = False  # Train using Jacobian-free backpropagation (JFB)
-    warmup: int = 0  # Epochs to train without JFB initially
+    warmup: int = 10  # Epochs to train without JFB initially
 
     def to_json(self, path: str) -> None:
         """Save hyperparameters to JSON file."""

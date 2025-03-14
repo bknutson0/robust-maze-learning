@@ -143,7 +143,8 @@ class ITNet(BaseNet):
         latents_initial = self.input_to_latent(inputs)
 
         # Iterative update loop with optional gradient tracking
-        with torch.no_grad() if (hyperparams.train_jfb and frac_epoch >= hyperparams.warmup) else nullcontext():
+        jfb = hyperparams.train_jfb and (frac_epoch >= hyperparams.warmup)
+        with torch.no_grad() if jfb else nullcontext():
             latents, iterations, diff_norm = self.latent_forward(
                 latents_initial, inputs, iters=hyperparams.iters - 1, tolerance=hyperparams.tolerance, return_extra=True
             )
@@ -170,10 +171,11 @@ class ITNet(BaseNet):
 
         # Log metrics to TensorBoard if a writer is provided
         if writer is not None:
-            writer.add_scalar('iterations/mean', iterations.float().mean().item(), int(frac_epoch * 100))
-            writer.add_scalar('iterations/max', iterations.max().item(), int(frac_epoch * 100))
-            writer.add_scalar('diff_norm/mean', diff_norm.mean().item(), int(frac_epoch * 100))
-            writer.add_scalar('diff_norm/max', diff_norm.max().item(), int(frac_epoch * 100))
+            writer.add_scalar('jfb/train_batch', float(jfb), int(frac_epoch * 100))
+            writer.add_scalar('iterations/mean/train_batch', iterations.float().mean().item(), int(frac_epoch * 100))
+            writer.add_scalar('iterations/max/train_batch', iterations.max().item(), int(frac_epoch * 100))
+            writer.add_scalar('diff_norm/mean/train_batch', diff_norm.mean().item(), int(frac_epoch * 100))
+            writer.add_scalar('diff_norm/max/train_batch', diff_norm.max().item(), int(frac_epoch * 100))
             writer.add_scalar('loss/train_batch', loss.item(), int(frac_epoch * 100))
             writer.add_scalar('output_norm/train_batch', torch.norm(outputs).item(), int(frac_epoch * 100))
             writer.add_scalar('latent_norm/train_batch', torch.norm(latents).item(), int(frac_epoch * 100))
