@@ -6,7 +6,7 @@ import torch
 
 # Device configuration
 # Prioritize PREFERRED_CUDA > CUDA > MPS > CPU
-PREFERRED_CUDA = 2
+PREFERRED_CUDA = 0
 DEVICE = None
 if torch.cuda.is_available():
     if torch.cuda.device_count() > PREFERRED_CUDA:
@@ -65,6 +65,7 @@ class Hyperparameters:
 
     # it_net specific
     tolerance: float = 1e-6  # Tolerance for convergence
+    contraction: float | None = 0.5  # Desired contraction factor, mildly enforced at every training step
     train_jfb: bool = False  # Train using Jacobian-free backpropagation (JFB)
     warmup: int = 10  # Epochs to train without JFB initially
 

@@ -149,6 +149,34 @@ class ITNet(BaseNet):
                 latents_initial, inputs, iters=hyperparams.iters - 1, tolerance=hyperparams.tolerance, return_extra=True
             )
 
+        # Mildly enforce contraction factor
+        if hyperparams.contraction is not None:
+            with torch.no_grad():
+                # Initialize batch of random pairs of latents
+                inputs_noise = torch.randn_like(latents_initial, device=latents_initial.device)
+                latents_noise = torch.randn_like(latents_initial, device=latents_initial.device)
+                inputs_with_noise = inputs + inputs_noise
+
+                # Compute normed difference before latent forward
+                latents_1 = latents_initial.clone()
+                latents_2 = latents_initial.clone() + latents_noise
+                norm_diff_before = torch.norm(latents_1 , p=2, dim=tuple(range(1, latents_initial.dim())))
+
+                # Compute normed difference after latent forward
+                norm_diff_after = torch.norm(
+                    self.latent_forward_layer(torch.cat([latents_1, inputs_with_noise], dim=1)) -
+                    self.latent_forward_layer(torch.cat([latents_2, inputs_with_noise], dim=1)),
+                    p=2, dim=tuple(range(1, latents_initial.dim()))
+                )
+
+                # Compute average contraction factor for the batch
+                contraction_estimate = (norm_diff_after / norm_diff_before).max().item()
+                print(f'{contraction_estimate = }')
+                if contraction_estimate > hyperparams.contraction:
+                    correction_factor = (hyperparams.contraction / contraction_estimate)**(1 / (2*self.num_blocks + 1)))
+                    
+
+
         # Final iteration with gradient tracking
         latents = latents_initial + (latents - latents_initial).detach().requires_grad_()
         latents = self.latent_forward_layer(torch.cat([latents, inputs], dim=1))
@@ -171,7 +199,9 @@ class ITNet(BaseNet):
 
         # Log metrics to TensorBoard if a writer is provided
         if writer is not None:
-            writer.add_scalar('jfb/train_batch', float(jfb), int(frac_epoch * 100))
+            # Log various metrics, starting with lr scheduler learning rate
+            writer.add_scalar('lr/train_batch', optimizer.param_groups[0]['lr'], int(frac_epoch * 100))
+            writer.add_scalar('jfb/train_batch', int(jfb), int(frac_epoch * 100))
             writer.add_scalar('iterations/mean/train_batch', iterations.float().mean().item(), int(frac_epoch * 100))
             writer.add_scalar('iterations/max/train_batch', iterations.max().item(), int(frac_epoch * 100))
             writer.add_scalar('diff_norm/mean/train_batch', diff_norm.mean().item(), int(frac_epoch * 100))
