@@ -153,29 +153,33 @@ class ITNet(BaseNet):
         if hyperparams.contraction is not None:
             with torch.no_grad():
                 # Initialize batch of random pairs of latents
-                inputs_noise = torch.randn_like(latents_initial, device=latents_initial.device)
+                inputs_noise = torch.randn_like(inputs, device=latents_initial.device)
                 latents_noise = torch.randn_like(latents_initial, device=latents_initial.device)
                 inputs_with_noise = inputs + inputs_noise
 
                 # Compute normed difference before latent forward
                 latents_1 = latents_initial.clone()
                 latents_2 = latents_initial.clone() + latents_noise
-                norm_diff_before = torch.norm(latents_1 , p=2, dim=tuple(range(1, latents_initial.dim())))
+                norm_diff_before = torch.norm(latents_1, p=2, dim=tuple(range(1, latents_initial.dim())))
 
                 # Compute normed difference after latent forward
                 norm_diff_after = torch.norm(
-                    self.latent_forward_layer(torch.cat([latents_1, inputs_with_noise], dim=1)) -
-                    self.latent_forward_layer(torch.cat([latents_2, inputs_with_noise], dim=1)),
-                    p=2, dim=tuple(range(1, latents_initial.dim()))
+                    self.latent_forward_layer(torch.cat([latents_1, inputs_with_noise], dim=1))
+                    - self.latent_forward_layer(torch.cat([latents_2, inputs_with_noise], dim=1)),
+                    p=2,
+                    dim=tuple(range(1, latents_initial.dim())),
                 )
 
                 # Compute average contraction factor for the batch
                 contraction_estimate = (norm_diff_after / norm_diff_before).max().item()
                 print(f'{contraction_estimate = }')
                 if contraction_estimate > hyperparams.contraction:
-                    correction_factor = (hyperparams.contraction / contraction_estimate)**(1 / (2*self.num_blocks + 1)))
-                    
-
+                    contraction_ratio = hyperparams.contraction / contraction_estimate
+                    exponent = 1 / (2 * self.num_blocks + 1)
+                    correction_factor = contraction_ratio**exponent
+                    for module in self.latent_forward_layer.modules():
+                        if isinstance(module, nn.Conv2d):
+                            module.weight.data *= correction_factor
 
         # Final iteration with gradient tracking
         latents = latents_initial + (latents - latents_initial).detach().requires_grad_()
