@@ -72,7 +72,7 @@ class ITNet(BaseNet):
         return_extra: bool = False,
     ) -> torch.Tensor | list[torch.Tensor]:
         """Perform the forward pass in the latent space."""
-        tolerance = tolerance if not None else Hyperparameters().tolerance
+        tolerance = tolerance if tolerance is not None else Hyperparameters().tolerance
 
         # Ensure iters is always a sorted list
         iters = [iters] if isinstance(iters, int) else sorted(iters)
@@ -101,11 +101,13 @@ class ITNet(BaseNet):
 
                 # Compute normed differences for previously unconverged latents
                 diff_norm[~converged] = torch.norm(
-                    latents[~converged] - latents_prev[~converged], p=2, dim=tuple(range(1, latents.dim()))
+                    latents[~converged] - latents_prev[~converged],
+                    p=Hyperparameters().p,
+                    dim=tuple(range(1, latents.dim())),
                 ).detach()
 
                 # Update convergence status
-                converged |= diff_norm < tolerance  # type: ignore
+                converged |= diff_norm < tolerance
 
             # Save latent representation at specified iterations
             if i + 1 in iters:
@@ -143,43 +145,51 @@ class ITNet(BaseNet):
         latents_initial = self.input_to_latent(inputs)
 
         # Iterative update loop with optional gradient tracking
-        jfb = hyperparams.train_jfb and (frac_epoch >= hyperparams.warmup)
+        jfb = hyperparams.train_jfb and (frac_epoch >= hyperparams.warmup_epochs)
         with torch.no_grad() if jfb else nullcontext():
+            # Uniformly sample from [1, iters] for each batch if random_max_iterations is enabled
+            if hyperparams.warmup_iters is not None and frac_epoch < hyperparams.warmup_epochs:
+                iters = int(hyperparams.warmup_iters - 1)
+            else:
+                iters = hyperparams.iters - 1
+
+            if hyperparams.random_iters:
+                iters = int(torch.randint(1, iters, (1,), device=inputs.device).item())
+            else:
+                iters = int(iters - 1)
             latents, iterations, diff_norm = self.latent_forward(
-                latents_initial, inputs, iters=hyperparams.iters - 1, tolerance=hyperparams.tolerance, return_extra=True
+                latents_initial, inputs, iters=iters, tolerance=hyperparams.tolerance, return_extra=True
             )
 
-        # Mildly enforce contraction factor
-        if hyperparams.contraction is not None:
-            with torch.no_grad():
-                # Initialize batch of random pairs of latents
-                inputs_noise = torch.randn_like(inputs, device=latents_initial.device)
-                latents_noise = torch.randn_like(latents_initial, device=latents_initial.device)
-                inputs_with_noise = inputs + inputs_noise
+        # Compute contraction factor, and mildly enforce if specified
+        with torch.no_grad():
+            # Initialize batch of random pairs of latents
+            inputs_noise = torch.randn_like(inputs, device=latents_initial.device)
+            latents_noise = torch.randn_like(latents_initial, device=latents_initial.device)
+            inputs_with_noise = inputs + inputs_noise
 
-                # Compute normed difference before latent forward
-                latents_1 = latents_initial.clone()
-                latents_2 = latents_initial.clone() + latents_noise
-                norm_diff_before = torch.norm(latents_1, p=2, dim=tuple(range(1, latents_initial.dim())))
+            # Compute normed difference before latent forward
+            latents_1 = latents_initial.clone()
+            latents_2 = latents_initial.clone() + latents_noise
+            norm_diff_before = torch.norm(latents_1, p=torch.inf, dim=tuple(range(1, latents_initial.dim())))
 
-                # Compute normed difference after latent forward
-                norm_diff_after = torch.norm(
-                    self.latent_forward_layer(torch.cat([latents_1, inputs_with_noise], dim=1))
-                    - self.latent_forward_layer(torch.cat([latents_2, inputs_with_noise], dim=1)),
-                    p=2,
-                    dim=tuple(range(1, latents_initial.dim())),
-                )
+            # Compute normed difference after latent forward
+            norm_diff_after = torch.norm(
+                self.latent_forward_layer(torch.cat([latents_1, inputs_with_noise], dim=1))
+                - self.latent_forward_layer(torch.cat([latents_2, inputs_with_noise], dim=1)),
+                p=hyperparams.p,
+                dim=tuple(range(1, latents_initial.dim())),
+            )
 
-                # Compute average contraction factor for the batch
-                contraction_estimate = (norm_diff_after / norm_diff_before).max().item()
-                print(f'{contraction_estimate = }')
-                if contraction_estimate > hyperparams.contraction:
-                    contraction_ratio = hyperparams.contraction / contraction_estimate
-                    exponent = 1 / (2 * self.num_blocks + 1)
-                    correction_factor = contraction_ratio**exponent
-                    for module in self.latent_forward_layer.modules():
-                        if isinstance(module, nn.Conv2d):
-                            module.weight.data *= correction_factor
+            # Compute average contraction factor for the batch
+            contraction_estimate = (norm_diff_after / norm_diff_before).max().item()
+            if hyperparams.contraction is not None and contraction_estimate > hyperparams.contraction:
+                contraction_ratio = hyperparams.contraction / contraction_estimate
+                exponent = 1 / (2 * self.num_blocks + 1)
+                correction_factor = contraction_ratio**exponent
+                for module in self.latent_forward_layer.modules():
+                    if isinstance(module, nn.Conv2d):
+                        module.weight.data *= correction_factor
 
         # Final iteration with gradient tracking
         latents = latents_initial + (latents - latents_initial).detach().requires_grad_()
@@ -203,7 +213,7 @@ class ITNet(BaseNet):
 
         # Log metrics to TensorBoard if a writer is provided
         if writer is not None:
-            # Log various metrics, starting with lr scheduler learning rate
+            writer.add_scalar('max_contraction/train_batch', contraction_estimate, int(frac_epoch * 100))
             writer.add_scalar('lr/train_batch', optimizer.param_groups[0]['lr'], int(frac_epoch * 100))
             writer.add_scalar('jfb/train_batch', int(jfb), int(frac_epoch * 100))
             writer.add_scalar('iterations/mean/train_batch', iterations.float().mean().item(), int(frac_epoch * 100))

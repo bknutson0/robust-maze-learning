@@ -76,7 +76,7 @@ class BaseNet(torch.nn.Module, ABC):
         """Compute predictions from the inputs, without tracking gradients."""
         with torch.no_grad():
             latents_initial = self.input_to_latent(inputs)
-            latents = self.latent_forward(latents_initial, inputs, iters)
+            latents = self.latent_forward(latents_initial, inputs, iters=iters)
             outputs = self.latent_to_output(latents)
             predictions = self.output_to_prediction(outputs, inputs)
 

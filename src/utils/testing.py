@@ -115,15 +115,11 @@ def is_minimal_path(inputs: torch.Tensor, predictions: torch.Tensor, solutions: 
 def is_correct(inputs: torch.Tensor, predictions: torch.Tensor, solutions: torch.Tensor) -> torch.Tensor:
     """Determine which predictions exactly match solutions or are also minimal paths."""
     # Mark as correct all predictions that exactly match corresponding solution
-    corrects = torch.tensor(compare_mazes(predictions, solutions))
+    corrects = compare_mazes(predictions, solutions)
 
     # For predictions that don't exactly match the solution, check if they are alternate solutions
     if not corrects.all():
-        corrects[~corrects] = torch.tensor(
-            is_minimal_path(inputs[~corrects], predictions[~corrects], solutions[~corrects]),
-            dtype=torch.bool,
-            device=corrects.device,
-        )
+        corrects[~corrects] = is_minimal_path(inputs[~corrects], predictions[~corrects], solutions[~corrects])
 
     return corrects
 
@@ -151,7 +147,7 @@ def specific_test(specific_test_params: TestParameters) -> DataFrame:
                     batch_idx * specific_test_params.batch_size + current_batch_size,
                 )
             )
-            predictions = model.predict(inputs, specific_test_params.iters, False)
+            predictions = model.predict(inputs, specific_test_params.iters)
             predictions = predictions if isinstance(predictions, list) else [predictions]
             for iter_index, iter_value in enumerate(specific_test_params.iters):  # type: ignore
                 # Tests cannot currently handle extra iters dimension TODO: Handle extra iters dimension

@@ -48,11 +48,11 @@ def train_epoch(
     # Compute training loss for the epoch, analogous to validation loss
     # Select random subset of training data with same size as validation data
     train_loss, train_acc = compute_average_loss_and_accuracy(hyperparams, train_subset_loader, model, criterion)
-    logger.info(f'Computed training loss/accuracy:   {round(train_loss, 8):.8f}/{round(train_acc, 4):.4f}')
+    logger.info(f'Computed training loss/accuracy:   {round(train_loss, 8):.4e}/{round(train_acc, 4):.4f}')
 
     # Perform validation once at the end of each epoch
     val_loss, val_acc = compute_average_loss_and_accuracy(hyperparams, validation_loader, model, criterion)
-    logger.info(f'Computed validation loss/accuracy: {round(val_loss, 8):.8f}/{round(val_acc, 4):.4f}')
+    logger.info(f'Computed validation loss/accuracy: {round(val_loss, 8):.4e}/{round(val_acc, 4):.4f}')
 
     # Update learning rate
     learning_rate_scheduler.step(val_acc)

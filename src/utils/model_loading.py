@@ -40,7 +40,7 @@ def load_model(model_name: str, pretrained: bool = True) -> BaseNet:
         #     # Create model and load weights
         #     model = PINet(width=cfg.problem.model.width, in_channels=3, config=cfg)
         #     state_dict = torch.load(model_path, map_location=device, weights_only=True)['net']
-    elif model_name == 'it_net':
+    elif 'it_net' in model_name:
         model = ITNet()
     else:
         raise ValueError(f'Unknown model name: {model_name}')

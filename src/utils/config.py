@@ -56,7 +56,7 @@ class Hyperparameters:
     learning_rate: float = 0.0001
     grad_clip: float | None = 1.0
     optimizer_name: str = 'AdamW'
-    learning_rate_scheduler_name: str = 'ReduceLROnPlateau'
+    learning_rate_scheduler_name: str | None = 'ReduceLROnPlateau'
     patience: int = 10
     reduction_factor: float = 0.1
 
@@ -64,10 +64,14 @@ class Hyperparameters:
     alpha: float = 0.01  # Progressive loss factor, originally 0.01 in "End-to-end algorithm synthesis"
 
     # it_net specific
-    tolerance: float = 1e-6  # Tolerance for convergence
-    contraction: float | None = 0.5  # Desired contraction factor, mildly enforced at every training step
-    train_jfb: bool = False  # Train using Jacobian-free backpropagation (JFB)
-    warmup: int = 10  # Epochs to train without JFB initially
+    tolerance: float = 1e-1  # Tolerance for convergence
+    p: float = torch.inf  # Specify p of p-norm used in convergence condition
+    random_iters: bool = False  # Randomly sample number of iterations from [1, iters] for each batch
+    contraction: float | None = 1.0  # Contraction factor to weakly enforce at every training step
+    train_jfb: bool = False  # Train using Jacobian-free backpropagation (JFB) TODO: change to backrop_iters
+    # Implicit network can benefit from warmup training, before implicit layer generally converges to fixed point
+    warmup_epochs: int = 10  # Epochs to train without JFB initially
+    warmup_iters: int | None = None  # Number of iterations to train during warmup
 
     def to_json(self, path: str) -> None:
         """Save hyperparameters to JSON file."""
