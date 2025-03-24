@@ -192,7 +192,8 @@ class ITNet(BaseNet):
                         module.weight.data *= correction_factor
 
         # Final iteration with gradient tracking
-        latents = latents_initial + (latents - latents_initial).detach().requires_grad_()
+        if jfb:  # Copy gradients from latents_initial to latents
+            latents = latents_initial + (latents - latents_initial).detach().requires_grad_()
         latents = self.latent_forward_layer(torch.cat([latents, inputs], dim=1))
 
         # Compute outputs from final latents

@@ -12,9 +12,9 @@ def main() -> None:
     hyperparams.pretrained = 'models/it_net/2025-03-23_12:27:31/checkpoints/epoch_10.pth'
     hyperparams.iters = 100
     hyperparams.num_mazes = int(1e5)
-    hyperparams.random_iters = False
-    hyperparams.contraction = None  # Try out no weak enforcement of contraction
-    hyperparams.train_jfb = True
+    hyperparams.random_iters = True
+    hyperparams.contraction = 1.0  # Try out no weak enforcement of contraction
+    hyperparams.train_jfb = False
     hyperparams.learning_rate = 1e-4
     hyperparams.batch_size = 32
     hyperparams.grad_clip = None
