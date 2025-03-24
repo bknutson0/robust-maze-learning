@@ -64,6 +64,20 @@ def load_model(model_name: str, pretrained: str | None = None) -> BaseNet:
             new_state_dict = {k.replace('module.', ''): v for k, v in state_dict.items()}
             model.load_state_dict(new_state_dict, strict=True)
 
+    # Initialize weights
+    # else:
+    #     for module in model.modules():
+    #         if isinstance(module, torch.nn.Conv2d):
+    #             torch.nn.init.kaiming_normal_(module.weight, mode='fan_out', nonlinearity='relu')
+    #             if module.bias is not None:
+    #                 torch.nn.init.constant_(module.bias, 0)
+    #         elif isinstance(module, torch.nn.BatchNorm2d):
+    #             torch.nn.init.constant_(module.weight, 1)
+    #             torch.nn.init.constant_(module.bias, 0)
+    #         elif isinstance(module, torch.nn.Linear):
+    #             torch.nn.init.normal_(module.weight, 0, 0.01)
+    #             torch.nn.init.constant_(module.bias, 0)
+
     # Log model loading
     logger.info(f'Loaded {model_name} to {DEVICE}')
 

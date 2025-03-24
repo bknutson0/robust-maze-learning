@@ -9,18 +9,18 @@ def main() -> None:
 
     # Modifications for training it_net
     hyperparams.model_name = 'it_net'  # Use as warmup
-    hyperparams.pretrained = 'models/it_net/2025-03-23_12:27:31/checkpoints/epoch_10.pth'
+    # hyperparams.pretrained = 'models/it_net/2025-03-23_12:27:31/checkpoints/epoch_10.pth'
     hyperparams.iters = 100
-    hyperparams.num_mazes = int(1e5)
-    hyperparams.random_iters = True
-    hyperparams.contraction = 1.0  # Try out no weak enforcement of contraction
-    hyperparams.train_jfb = False
-    hyperparams.learning_rate = 1e-4
+    hyperparams.num_mazes = int(1e4)
+    hyperparams.random_iters = False
+    hyperparams.contraction = False  # Try out no weak enforcement of contraction
+    hyperparams.train_jfb = True
+    hyperparams.learning_rate = 1e-3
     hyperparams.batch_size = 32
     hyperparams.grad_clip = None
     hyperparams.tolerance = 1e-1  # TODO: adjust
-    hyperparams.warmup_epochs = 0
-    hyperparams.warmup_iters = 30
+    hyperparams.warmup_epochs = 10
+    hyperparams.warmup_iters = 10
     hyperparams.patience = 10  # TODO: adjust
 
     # Define percolation values for fine-tuning

@@ -147,19 +147,35 @@ class ITNet(BaseNet):
         # Iterative update loop with optional gradient tracking
         jfb = hyperparams.train_jfb and (frac_epoch >= hyperparams.warmup_epochs)
         with torch.no_grad() if jfb else nullcontext():
-            # Uniformly sample from [1, iters] for each batch if random_max_iterations is enabled
             if hyperparams.warmup_iters is not None and frac_epoch < hyperparams.warmup_epochs:
-                iters = int(hyperparams.warmup_iters - 1)
+                iters = int(hyperparams.warmup_iters)
             else:
-                iters = hyperparams.iters - 1
+                iters = hyperparams.iters
 
             if hyperparams.random_iters:
-                iters = int(torch.randint(1, iters, (1,), device=inputs.device).item())
-            else:
-                iters = int(iters - 1)
+                iters = int(torch.randint(1, iters + 1, (1,), device=inputs.device).item())
+
             latents, iterations, diff_norm = self.latent_forward(
                 latents_initial, inputs, iters=iters, tolerance=hyperparams.tolerance, return_extra=True
             )
+
+        # Final iteration with gradient tracking
+        if jfb:  # Copy gradients from latents_initial to latents
+            latents = latents_initial + (latents - latents_initial).detach().requires_grad_()
+        latents = self.latent_forward_layer(torch.cat([latents, inputs], dim=1))
+
+        # Compute outputs from final latents
+        outputs = self.latent_to_output(latents)
+
+        # Compute loss with deterministic algorithms disabled for performance
+        torch.use_deterministic_algorithms(False)
+        loss = criterion(outputs, solutions).mean()
+        torch.use_deterministic_algorithms(True)
+
+        # Backpropagation and gradient clipping (if enabled)
+        loss.backward()
+        if hyperparams.grad_clip is not None:
+            torch.nn.utils.clip_grad_norm_(self.parameters(), hyperparams.grad_clip)
 
         # Compute contraction factor, and mildly enforce if specified
         with torch.no_grad():
@@ -190,24 +206,6 @@ class ITNet(BaseNet):
                 for module in self.latent_forward_layer.modules():
                     if isinstance(module, nn.Conv2d):
                         module.weight.data *= correction_factor
-
-        # Final iteration with gradient tracking
-        if jfb:  # Copy gradients from latents_initial to latents
-            latents = latents_initial + (latents - latents_initial).detach().requires_grad_()
-        latents = self.latent_forward_layer(torch.cat([latents, inputs], dim=1))
-
-        # Compute outputs from final latents
-        outputs = self.latent_to_output(latents)
-
-        # Compute loss with deterministic algorithms disabled for performance
-        torch.use_deterministic_algorithms(False)
-        loss = criterion(outputs, solutions).mean()
-        torch.use_deterministic_algorithms(True)
-
-        # Backpropagation and gradient clipping (if enabled)
-        loss.backward()
-        if hyperparams.grad_clip is not None:
-            torch.nn.utils.clip_grad_norm_(self.parameters(), hyperparams.grad_clip)
 
         # Optimizer step to update model parameters
         optimizer.step()
