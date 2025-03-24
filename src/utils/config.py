@@ -48,6 +48,7 @@ class Hyperparameters:
 
     # Training parameters
     pretrained: str | None = None  # Path to pretrained model, if any
+    weight_init: str | None = None  # Weight initialization scheme, if any
     validation_size: float = 0.1
     train_size: float = 1.0 - validation_size
     batch_size: int = 32

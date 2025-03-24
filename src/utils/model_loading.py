@@ -3,6 +3,7 @@ import logging
 import os
 
 import torch
+from torch import nn
 
 from src.models.base_net import BaseNet
 from src.models.dt_net import DTNet
@@ -17,8 +18,8 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
-def load_model(model_name: str, pretrained: str | None = None) -> BaseNet:
-    """Initialize model and load weights if pretrained."""
+def load_model(model_name: str, pretrained: str | None = None, weight_init: str | None = None) -> BaseNet:
+    """Initialize model and load weights if pretrained. Optionally perform weight initialization."""
     model: BaseNet
     state_dict = None
 
@@ -27,61 +28,50 @@ def load_model(model_name: str, pretrained: str | None = None) -> BaseNet:
         model = DTNet()
     elif model_name == 'pi_net':
         raise NotImplementedError('PINet model not implemented yet')
-        #     cfg_path = 'models/pi_net/aric/config.yaml'
-        #     model_path = 'models/pi_net/aric/model_best_130_100.0.pth'
-
-        #     # Get config dictionary, convert to omega config, and fix attributes
-        #     with open(cfg_path) as f:
-        #         cfg_dict = yaml.load(f, Loader=yaml.FullLoader)
-        #     cfg = OmegaConf.create(cfg_dict)
-        #     cfg.problem.deq.jacobian_factor = 1.0
-        #     cfg.problem.model.model_path = model_path
-
-        #     # Create model and load weights
-        #     model = PINet(width=cfg.problem.model.width, in_channels=3, config=cfg)
-        #     state_dict = torch.load(model_path, map_location=device, weights_only=True)['net']
     elif 'it_net' in model_name:
         model = ITNet()
     else:
         raise ValueError(f'Unknown model name: {model_name}')
 
-    # Move model to device and set to eval mode
     model.to(DEVICE)
     model.eval()
 
-    # Load pretrained weights
-    if pretrained is not None:
-        # Load state dict
+    if pretrained is not None and weight_init is not None:
+        raise ValueError('Cannot specify both pretrained and weight_init')
+    elif pretrained is not None:
+        # Load pretrained weights
         if model_name == 'dt_net':
             state_dict = torch.load(pretrained, map_location=DEVICE, weights_only=True)['net']
         else:
             state_dict = torch.load(pretrained, map_location=DEVICE, weights_only=True)
-
-        # Load state dict into model
         if state_dict is None:
             raise ValueError(f'Failed to load pretrained weights for model: {model_name}')
-        else:
-            new_state_dict = {k.replace('module.', ''): v for k, v in state_dict.items()}
-            model.load_state_dict(new_state_dict, strict=True)
+        new_state_dict = {k.replace('module.', ''): v for k, v in state_dict.items()}
+        model.load_state_dict(new_state_dict, strict=True)
+    else:
+        # Explicit weight initialization if no pretrained weights
+        if weight_init is not None:
+            initialize_weights(model, weight_init)
 
-    # Initialize weights
-    # else:
-    #     for module in model.modules():
-    #         if isinstance(module, torch.nn.Conv2d):
-    #             torch.nn.init.kaiming_normal_(module.weight, mode='fan_out', nonlinearity='relu')
-    #             if module.bias is not None:
-    #                 torch.nn.init.constant_(module.bias, 0)
-    #         elif isinstance(module, torch.nn.BatchNorm2d):
-    #             torch.nn.init.constant_(module.weight, 1)
-    #             torch.nn.init.constant_(module.bias, 0)
-    #         elif isinstance(module, torch.nn.Linear):
-    #             torch.nn.init.normal_(module.weight, 0, 0.01)
-    #             torch.nn.init.constant_(module.bias, 0)
-
-    # Log model loading
     logger.info(f'Loaded {model_name} to {DEVICE}')
-
     return model
+
+
+def initialize_weights(model: nn.Module, scheme: str) -> None:
+    """Initialize model weights according to the specified scheme."""
+    for module in model.modules():
+        if isinstance(module, nn.Conv2d | nn.Linear):
+            if scheme == 'kaiming':
+                nn.init.kaiming_normal_(module.weight, mode='fan_out', nonlinearity='relu')
+            elif scheme == 'xavier':
+                nn.init.xavier_normal_(module.weight)
+            else:
+                raise ValueError(f'Unsupported scheme: {scheme}')
+            if module.bias is not None:
+                nn.init.constant_(module.bias, 0)
+        elif isinstance(module, nn.BatchNorm2d):
+            nn.init.constant_(module.weight, 1)
+            nn.init.constant_(module.bias, 0)
 
 
 def get_all_model_names() -> list[str]:
