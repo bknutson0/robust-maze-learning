@@ -17,7 +17,7 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
-def load_model(model_name: str, pretrained: bool = True) -> BaseNet:
+def load_model(model_name: str, pretrained: str | None = None) -> BaseNet:
     """Initialize model and load weights if pretrained."""
     model: BaseNet
     state_dict = None
@@ -50,16 +50,12 @@ def load_model(model_name: str, pretrained: bool = True) -> BaseNet:
     model.eval()
 
     # Load pretrained weights
-    if pretrained:
+    if pretrained is not None:
         # Load state dict
         if model_name == 'dt_net':
-            state_dict = torch.load('models/dt_net/original.pth', map_location=DEVICE, weights_only=True)['net']
-        elif model_name == 'pi_net':
-            raise NotImplementedError('PINet model not implemented yet')
-        elif model_name == 'it_net':
-            state_dict = torch.load('models/it_net/epoch_10.pth', map_location=DEVICE, weights_only=True)
+            state_dict = torch.load(pretrained, map_location=DEVICE, weights_only=True)['net']
         else:
-            state_dict = torch.load(model_name, map_location=DEVICE, weights_only=True)
+            state_dict = torch.load(pretrained, map_location=DEVICE, weights_only=True)
 
         # Load state dict into model
         if state_dict is None:

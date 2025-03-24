@@ -6,7 +6,7 @@ import torch
 
 # Device configuration
 # Prioritize PREFERRED_CUDA > CUDA > MPS > CPU
-PREFERRED_CUDA = 0
+PREFERRED_CUDA = 2
 DEVICE = None
 if torch.cuda.is_available():
     if torch.cuda.device_count() > PREFERRED_CUDA:
@@ -47,7 +47,7 @@ class Hyperparameters:
     iters: int = 30
 
     # Training parameters
-    pretrained: bool = False
+    pretrained: str | None = None  # Path to pretrained model, if any
     validation_size: float = 0.1
     train_size: float = 1.0 - validation_size
     batch_size: int = 32
@@ -56,7 +56,7 @@ class Hyperparameters:
     learning_rate: float = 0.0001
     grad_clip: float | None = 1.0
     optimizer_name: str = 'AdamW'
-    learning_rate_scheduler_name: str | None = 'ReduceLROnPlateau'
+    learning_rate_scheduler_name: str = 'ReduceLROnPlateau'
     patience: int = 10
     reduction_factor: float = 0.1
 
