@@ -1,6 +1,8 @@
 import json
+import math
 import os
 from dataclasses import asdict, dataclass, field
+from typing import Any
 
 import torch
 
@@ -74,11 +76,20 @@ class Hyperparameters:
     warmup_epochs: int = 10  # Epochs to train without JFB initially
     warmup_iters: int | None = None  # Number of iterations to train during warmup
 
-    def to_json(self, path: str) -> None:
-        """Save hyperparameters to JSON file."""
-        os.makedirs(os.path.dirname(path), exist_ok=True)
-        with open(path, 'w') as f:
-            json.dump(asdict(self), f, indent=4)
+    def to_dict(self) -> dict[str, Any]:
+        """Return a dictionary with JSON-serializable values."""
+
+        def sanitize(value: Any) -> int | float | str | dict[str, Any] | list[Any]:  # noqa: ANN401
+            """Recursively sanitize values to ensure JSON-serializability."""
+            if isinstance(value, float) and math.isinf(value):
+                return 'Infinity'  # or another representation if preferred
+            elif isinstance(value, dict):
+                return {k: sanitize(v) for k, v in value.items()}
+            elif isinstance(value, list):
+                return [sanitize(v) for v in value]
+            return value  # type: ignore
+
+        return {k: sanitize(v) for k, v in asdict(self).items()}
 
 
 # Testing parameters
