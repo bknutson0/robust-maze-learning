@@ -9,6 +9,7 @@ def main() -> None:
 
     # Modifications for training it_net
     hyperparams.model_name = 'it_net'
+    hyperparams.pretrained = 'models/it_net/2025-03-23_12:27:31/checkpoints/epoch_10.pth'
     hyperparams.iters = 100
     hyperparams.num_mazes = int(1e5)
     hyperparams.random_iters = True
@@ -23,11 +24,11 @@ def main() -> None:
     hyperparams.patience = 10
 
     # Define percolation values for fine-tuning
-    percolations = [0.000, 0.001]  # job:1
-    percolations = [0.003, 0.01]  # job: 2
-    percolations = [0.03, 0.1]  # job:3
-    percolations = [0.2, 0.3, 0.4]  # job:4
-    percolations = [0.5, 0.6, 0.7]  # cuda:1
+    # percolations = [0.000, 0.001]  # job:1
+    # percolations = [0.003, 0.01]  # job: 2
+    # percolations = [0.03, 0.1]  # job:3
+    # percolations = [0.2, 0.3, 0.4]  # job:4
+    # percolations = [0.5, 0.6, 0.7]  # cuda:1
     percolations = [0.8, 0.9, 0.99]  # cuda:2
 
     # Train the model for each percolation value
