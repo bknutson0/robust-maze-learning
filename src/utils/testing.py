@@ -14,6 +14,7 @@ from src.utils.maze_loading import maze_loaders
 from src.utils.model_loading import get_model_hyperparameters, load_model
 
 
+@torch.no_grad()
 def compare_mazes(mazes_1: torch.Tensor, mazes_2: torch.Tensor) -> torch.Tensor:
     """Compare two batches of mazes, and return 1D tensor of boolean values indicating which mazes match."""
     if mazes_1.shape != mazes_2.shape:
@@ -22,6 +23,7 @@ def compare_mazes(mazes_1: torch.Tensor, mazes_2: torch.Tensor) -> torch.Tensor:
     return torch.eq(mazes_1, mazes_2).all(dim=tuple(range(1, mazes_1.ndim)))
 
 
+@torch.no_grad()
 def validate_connected_components(predictions: torch.Tensor) -> torch.Tensor:
     """Check path and non-path pixels of predictions each form a single connected component."""
     if predictions.ndim == 2:
@@ -45,6 +47,7 @@ def validate_connected_components(predictions: torch.Tensor) -> torch.Tensor:
     return torch.tensor(result, dtype=torch.bool, device=predictions.device)
 
 
+@torch.no_grad()
 def is_valid_path(inputs: torch.Tensor, predictions: torch.Tensor) -> torch.Tensor:
     """Check if predictions are valid paths for inputs mazes."""
     if inputs.dim() != (predictions.dim() + 1):
@@ -101,6 +104,7 @@ def is_valid_path(inputs: torch.Tensor, predictions: torch.Tensor) -> torch.Tens
     return contains_start & contains_end & non_matching_pixels_are_black & tiles_are_valid & valid_connected_components
 
 
+@torch.no_grad()
 def is_minimal_path(inputs: torch.Tensor, predictions: torch.Tensor, solutions: torch.Tensor) -> torch.Tensor:
     """Check if predictions are minimal paths for inputs mazes, with same length as solutions."""
     # Check that predictions are valid paths
@@ -112,6 +116,7 @@ def is_minimal_path(inputs: torch.Tensor, predictions: torch.Tensor, solutions: 
     return are_valid & are_minimal
 
 
+@torch.no_grad()
 def is_correct(inputs: torch.Tensor, predictions: torch.Tensor, solutions: torch.Tensor) -> torch.Tensor:
     """Determine which predictions exactly match solutions or are also minimal paths."""
     # Mark as correct all predictions that exactly match corresponding solution
@@ -124,6 +129,7 @@ def is_correct(inputs: torch.Tensor, predictions: torch.Tensor, solutions: torch
     return corrects
 
 
+@torch.no_grad()
 def specific_test(specific_test_params: TestParameters) -> DataFrame:
     """Run test on models, with specific parameters."""
     result = pd.DataFrame()
@@ -195,6 +201,7 @@ def specific_test(specific_test_params: TestParameters) -> DataFrame:
     return result
 
 
+@torch.no_grad()
 def test(test_params: TestParameters) -> DataFrame:
     """Run tests with all combinations of parameters on all models, and save results."""
     # Create a list of specific TestParameters objects for each combination of parameters
