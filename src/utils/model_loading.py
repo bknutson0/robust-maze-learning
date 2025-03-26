@@ -1,3 +1,4 @@
+import inspect
 import json
 import logging
 import os
@@ -92,7 +93,11 @@ def get_model_hyperparameters(model_name: str) -> Hyperparameters:
     with open(results_path) as f:
         results = json.load(f)
 
-    # Load results['hyperparameters'] into Hyperparameters object
-    hyperparameters = Hyperparameters(**results['hyperparameters'])
+    # Get only valid keys for Hyperparameters
+    hyperparams = results['hyperparameters']
+    valid_keys = set(inspect.signature(Hyperparameters.__init__).parameters.keys())
+    valid_keys.discard('self')
+    filtered_hyperparams = {k: v for k, v in hyperparams.items() if k in valid_keys}
 
-    return hyperparameters
+    # Load filtered hyperparameters into Hyperparameters object
+    return Hyperparameters(**filtered_hyperparams)

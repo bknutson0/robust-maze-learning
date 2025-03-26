@@ -25,7 +25,7 @@ else:
 LOGGING_LEVEL = 'INFO'  # Set logging level globally
 
 # Parameters for training and testing the model
-TOLERANCE = 1e-6  # Tolerance for convergence in it_net
+TOLERANCE = 1e-1  # Tolerance for convergence in it_net
 
 
 # Training hyperparameters
@@ -67,7 +67,7 @@ class Hyperparameters:
     alpha: float = 0.01  # Progressive loss factor, originally 0.01 in "End-to-end algorithm synthesis"
 
     # it_net specific
-    tolerance: float = 1e-1  # Tolerance for convergence
+    tolerance: float = TOLERANCE  # Tolerance for convergence
     p: float = torch.inf  # Specify p of p-norm used in convergence condition
     random_iters: bool = False  # Randomly sample number of iterations from [1, iters] for each batch
     contraction: float | None = 1.0  # Contraction factor to weakly enforce at every training step

@@ -203,7 +203,18 @@ def specific_test(specific_test_params: TestParameters) -> DataFrame:
 
 @torch.no_grad()
 def test(test_params: TestParameters) -> DataFrame:
-    """Run tests with all combinations of parameters on all models, and save results."""
+    """Run tests with all combinations of parameters on all models, and save results before and during testing."""
+    # Create outputs and test directories up front
+    os.makedirs('outputs', exist_ok=True)
+    os.makedirs(os.path.join('outputs', 'tests'), exist_ok=True)
+    test_file = datetime.datetime.now().strftime('%Y-%m-%d_%H:%M:%S')
+    test_dir = os.path.join('outputs', 'tests', test_file)
+    os.makedirs(test_dir, exist_ok=True)
+
+    # Save test parameters to JSON before testing begins
+    test_params_file = os.path.join(test_dir, 'test_parameters.json')
+    test_params.to_json(test_params_file)
+
     # Create a list of specific TestParameters objects for each combination of parameters
     test_params_dict = {k: v if isinstance(v, list) else [v] for k, v in vars(test_params).items()}
     test_params_dict.pop('iters')
@@ -216,31 +227,19 @@ def test(test_params: TestParameters) -> DataFrame:
             sorted(test_params.iters) if isinstance(test_params.iters, list) else [test_params.iters]
         )
         for key, value in zip(test_params_dict.keys(), values, strict=False):
-            if key != 'iters' and key != 'model_name':
+            if key not in ['iters', 'model_name']:
                 setattr(specific_test_params, key, value)
         specific_test_params_list.append(specific_test_params)
 
-    # Run tests on each specific TestParameters object, to reduce redundant model and maze loading
+    # File to save partial and final results
+    results_file = os.path.join(test_dir, 'results.csv')
+
+    # Run tests and save results after each test iteration
     results = pd.DataFrame()
     for specific_test_params in specific_test_params_list:
-        results = pd.concat([results, specific_test(specific_test_params)])
-
-    # Create outputs directory if it doesn't exist
-    os.makedirs('outputs', exist_ok=True)
-
-    # Create tests directory if it doesn't exist
-    os.makedirs(os.path.join('outputs', 'tests'), exist_ok=True)
-
-    # Create an individual test directory if it doesn't exist
-    test_file = datetime.datetime.now().strftime('%Y-%m-%d_%H:%M:%S')
-    test_dir = os.path.join('outputs', 'tests', test_file)
-
-    # Save test parameters to JSON
-    test_params_file = os.path.join(test_dir, 'test_parameters.json')
-    test_params.to_json(test_params_file)
-
-    # Save results to CSV
-    results_file = os.path.join(test_dir, 'results.csv')
-    results.to_csv(results_file, index=False)
+        res = specific_test(specific_test_params)
+        results = pd.concat([results, res])
+        # Save partial results after each test run
+        results.to_csv(results_file, index=False)
 
     return results
