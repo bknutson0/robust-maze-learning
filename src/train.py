@@ -13,7 +13,7 @@ def main() -> None:
     hyperparams.iters = 100
     hyperparams.num_mazes = int(1e5)
     hyperparams.random_iters = True
-    hyperparams.contraction = None
+    hyperparams.contraction = 1.0
     hyperparams.train_jfb = True
     hyperparams.learning_rate = 1e-4
     hyperparams.batch_size = 32
@@ -24,12 +24,10 @@ def main() -> None:
     hyperparams.patience = 10
 
     # Define percolation values for fine-tuning
-    # percolations = [0.000, 0.001]  # job:1
-    # percolations = [0.003, 0.01]  # job: 2
-    # percolations = [0.03, 0.1]  # job:3
-    # percolations = [0.2, 0.3, 0.4]  # job:4
-    # percolations = [0.5, 0.6, 0.7]  # cuda:1
-    percolations = [0.8, 0.9, 0.99]  # cuda:2
+    # percolations = [0.000, 0.001, 0.003, 0.01]  # cuda:1
+    percolations = [0.03, 0.1, 0.2, 0.3]  # cuda:2
+    # percolations = [0.4, 0.5, 0.6, 0.7]  # job:1
+    # percolations = [0.8, 0.9, 0.99]  # job:2
 
     # Train the model for each percolation value
     for percolation in percolations:

@@ -3,7 +3,6 @@ import json
 import logging
 import os
 import time
-from dataclasses import asdict
 from typing import Any
 
 import torch
@@ -121,7 +120,7 @@ def train(hyperparams: Hyperparameters) -> float:
         'best_epoch': None,
         'best_validation_accuracy': 0.0,
         'total_train_time': None,
-        'hyperparameters': asdict(hyperparams),
+        'hyperparameters': hyperparams.to_dict(),
         'epoch_summaries': {},
     }
     with open(os.path.join(run_dir, 'results.json'), 'w') as f:

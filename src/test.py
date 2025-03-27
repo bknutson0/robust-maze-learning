@@ -13,9 +13,21 @@ def main() -> None:
     # Random initial weights dt-net models (03-01 to 03-03)
     # model_names = [name for name in model_names if ('it_net' in name) and ('best' in name) and ('2025-03-0' in name)]
     # Random initial weights and progressive learning dt-net models (03-11 to 03-13)
-    model_names = [name for name in model_names if ('dt_net' in name) and ('best' in name) and ('2025-03-1' in name)]
+    # model_names = [name for name in model_names if ('dt_net' in name) and ('best' in name) and ('2025-03-1' in name)]
 
     # it-net
+    # Random iters, JFB, without contraction it-net models (03-25 to 03-26)
+    model_names = [
+        name
+        for name in model_names
+        if ('dt_net' in name) and ('best' in name) and ('2025-03-25' in name or '2025-03-26' in name)
+    ]
+    # Random iters, JFB, with contraction it-net models (03-25 to 03-26)
+    model_names = [
+        name
+        for name in model_names
+        if ('dt_net' in name) and ('best' in name) and ('2025-03-25' in name or '2025-03-26' in name)
+    ]
 
     # Define test parameters
     test_params = TestParameters()
