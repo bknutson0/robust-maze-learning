@@ -1,6 +1,5 @@
 from src.utils.config import TestParameters
 from src.utils.model_loading import get_all_model_names
-from src.utils.testing import test
 
 
 def main() -> None:
@@ -8,6 +7,8 @@ def main() -> None:
     model_names = get_all_model_names()
 
     # dt-net
+    # Original dt-net model
+    model_names = ['models/dt_net/original.pth']
     # Pre-trained dt-net models (02-26 to 02-28)
     # model_names = [name for name in model_names if ('dt_net' in name) and ('best' in name) and ('2025-02-2' in name)]
     # Random initial weights dt-net models (03-01 to 03-03)
@@ -17,27 +18,31 @@ def main() -> None:
 
     # it-net
     # Random iters, JFB, without contraction it-net models (03-25 to 03-26)
-    model_names = [
-        name
-        for name in model_names
-        if ('dt_net' in name) and ('best' in name) and ('2025-03-25' in name or '2025-03-26' in name)
-    ]
-    # Random iters, JFB, with contraction it-net models (03-25 to 03-26)
-    model_names = [
-        name
-        for name in model_names
-        if ('dt_net' in name) and ('best' in name) and ('2025-03-25' in name or '2025-03-26' in name)
-    ]
+    # model_names = [
+    #     name
+    #     for name in model_names
+    #     if ('it_net' in name) and ('best' in name) and ('2025-03-25' in name or '2025-03-26' in name)
+    # ]
+    # Random iters, JFB, with contraction it-net models (03-27 to 03-29)
+    # model_names = [
+    #     name
+    #     for name in model_names
+    #     if ('it_net' in name)
+    #     and ('best' in name)
+    #     and ('2025-03-27' in name or '2025-03-28' in name or '2025-03-29' in name)
+    # ]
 
     # Define test parameters
     test_params = TestParameters()
     test_params.model_name = sorted(model_names)
-    test_params.maze_size = [9, 13, 17, 21]
-    test_params.num_mazes = 10000
+    test_params.maze_size = [9]
+    test_params.num_mazes = 1000
     test_params.iters = [30, 60, 100]
 
     # Perform test
-    test(test_params)
+    # test(test_params)
+    for name in test_params.model_name:
+        print(name)
 
 
 if __name__ == '__main__':

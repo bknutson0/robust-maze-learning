@@ -19,6 +19,17 @@ def plot_test_accuracies(test_name: str, plot_type: str, filters: dict[str, Any]
 
     # Plot accuracy versus test percolation for each model
     if plot_type == 'acc_vs_perc':
+        # Apply filters
+        filtered_df = df.copy()
+        if filters:
+            for col, val in filters.items():
+                if col not in df.columns:
+                    raise ValueError(f"Invalid column: '{col}' does not exist in the dataframe.")
+                if col == 'model_name' and val not in model_names:
+                    raise ValueError(f"Invalid model name: '{val}'. Must be one of {model_names}.")
+                filtered_df = filtered_df[filtered_df[col] == val]
+        df = filtered_df
+
         # Get train percolations
         train_percolations = []
         for model_name in model_names:

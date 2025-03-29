@@ -5,21 +5,30 @@ from src.utils.analysis import plot_test_accuracies
 
 def main() -> None:
     """Analyze test results."""
-    test_name = '2025-03-04_12:26:21'
+    # Random initial weights without progressive learning dt-net models (03-01 to 03-03)
+    # test_name = '2025-03-04_12:26:21'
+    # Random initial weights and progressive learning dt-net models (03-11 to 03-13)
+    test_name = '2025-03-26_18:12:08'
+    # test_name = '2025-03-27_16:35:05'
 
     df = pd.read_csv(f'outputs/tests/{test_name}/results.csv')
-    print(df.head(20))
+    # print(df.head(20))
+    # Print unique values in each column
+    for column in df.columns:
+        unique_values = df[column].unique()
+        print(f'{column}: {unique_values}')
 
-    # For each model_name, print train_percolation
-    model_names = df['model_name'].unique().tolist()
-    for model_name in model_names:
-        train_percolation = df[df['model_name'] == model_name]['train_percolation'].unique()
-        print(f'{model_name = }, {train_percolation[0] = }')
+    # # For each model_name, print train_percolation
+    # model_names = df['model_name'].unique().tolist()
+    # for model_name in model_names:
+    #     train_percolation = df[df['model_name'] == model_name]['train_percolation'].unique()
+    #     print(f'{model_name = }, {train_percolation[0] = }')
 
     plot_test_accuracies(
         test_name,
         'acc_vs_perc',
-        filters={'model_name': 'models/dt_net/20250211_174547/best.pth', 'test_iter': 30},
+        filters={'test_iter': 100, 'test_maze_size': 9},
+        # filters={'model_name': 'models/dt_net/20250211_174547/best.pth', 'test_iter': 30},
     )
 
     # #Plot mazes
