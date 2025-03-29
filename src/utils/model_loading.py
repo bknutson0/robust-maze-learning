@@ -22,7 +22,8 @@ logger = logging.getLogger(__name__)
 def load_model(model_name: str, pretrained: str | None = None, weight_init: str | None = None) -> BaseNet:
     """Initialize model and load weights if pretrained. Optionally perform weight initialization."""
     model: BaseNet
-    state_dict = None
+    if pretrained and weight_init:
+        raise ValueError('Cannot specify both pretrained and weight_init')
 
     # Initialize model
     if 'dt_net' in model_name:
@@ -35,24 +36,32 @@ def load_model(model_name: str, pretrained: str | None = None, weight_init: str 
         raise ValueError(f'Unknown model name: {model_name}')
 
     model.to(DEVICE)
+
+    for param in model.parameters():
+        param.data.zero_()
+
+    # Initialize model based on its name.
+    if 'dt_net' in model_name:
+        model = DTNet()
+    elif 'it_net' in model_name:
+        model = ITNet()
+    elif model_name == 'pi_net':
+        raise NotImplementedError('PINet model not implemented yet')
+    else:
+        raise ValueError(f'Unknown model name: {model_name}')
+
+    model.to(DEVICE)
     model.eval()
 
-    if pretrained is not None and weight_init is not None:
-        raise ValueError('Cannot specify both pretrained and weight_init')
-    elif pretrained is not None:
-        # Load pretrained weights
-        if model_name == 'dt_net':
-            state_dict = torch.load(pretrained, map_location=DEVICE, weights_only=True)['net']
-        else:
-            state_dict = torch.load(pretrained, map_location=DEVICE, weights_only=True)
-        if state_dict is None:
-            raise ValueError(f'Failed to load pretrained weights for model: {model_name}')
-        new_state_dict = {k.replace('module.', ''): v for k, v in state_dict.items()}
-        model.load_state_dict(new_state_dict, strict=True)
-    else:
-        # Explicit weight initialization if no pretrained weights
-        if weight_init is not None:
-            initialize_weights(model, weight_init)
+    if pretrained:
+        # Load state dict and extract 'net' if available.
+        state_dict = torch.load(pretrained, map_location=DEVICE, weights_only=True)
+        state_dict = state_dict.get('net', state_dict)
+        # Remove potential DataParallel wrapper keys.
+        state_dict = {k.replace('module.', ''): v for k, v in state_dict.items()}
+        model.load_state_dict(state_dict, strict=True)
+    elif weight_init:
+        initialize_weights(model, weight_init)
 
     logger.info(f'Loaded {model_name} to {DEVICE}')
     return model

@@ -14,7 +14,7 @@ from src.utils.config import DEVICE, LOGGING_LEVEL, Hyperparameters
 from src.utils.maze_loading import maze_loaders
 from src.utils.model_loading import load_model
 from src.utils.seeding import set_seed
-from src.utils.testing import is_minimal_path
+from src.utils.testing import is_correct
 
 # Create logger
 logging.basicConfig(
@@ -91,7 +91,7 @@ def compute_average_loss_and_accuracy(
 
             # Compute corrects
             predictions = model.output_to_prediction(outputs, inputs)
-            corrects = is_minimal_path(inputs, predictions, solutions)
+            corrects = is_correct(inputs, predictions, solutions)
             total_correct += int(corrects.sum().item())
             total_samples += inputs.size(0)
 
