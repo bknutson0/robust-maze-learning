@@ -71,7 +71,9 @@ def initialize_weights(model: nn.Module, scheme: str) -> None:
     """Initialize model weights according to the specified scheme."""
     for module in model.modules():
         if isinstance(module, nn.Conv2d | nn.Linear):
-            if scheme == 'kaiming':
+            if scheme == 'zero':
+                nn.init.zeros_(module.weight)
+            elif scheme == 'kaiming':
                 nn.init.kaiming_normal_(module.weight, mode='fan_out', nonlinearity='relu')
             elif scheme == 'xavier':
                 nn.init.xavier_normal_(module.weight)
