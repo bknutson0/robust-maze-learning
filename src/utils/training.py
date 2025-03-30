@@ -132,7 +132,7 @@ def train(hyperparams: Hyperparameters) -> float:
     train_loader, train_subset_loader, validation_loader = maze_loaders(hyperparams)
 
     # Load the model
-    model: BaseNet = load_model(hyperparams.model_name, hyperparams.pretrained, hyperparams.weight_init)
+    model: BaseNet = load_model(pretrained=hyperparams.pretrained, weight_init=hyperparams.weight_init)
 
     # Create the criterion and optimizer
     criterion = torch.nn.CrossEntropyLoss()

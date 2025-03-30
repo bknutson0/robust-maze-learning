@@ -142,7 +142,7 @@ def specific_test(specific_test_params: TestParameters) -> DataFrame:
     # Perform specific test
     test_loader = maze_loaders(specific_test_params)
     for model_name in specific_test_params.model_name:
-        model = load_model(model_name)
+        model = load_model(pretrained=model_name)
         hyperparameters = get_model_hyperparameters(model_name)
         model.eval()
         for batch_idx, (inputs, solutions) in enumerate(test_loader):

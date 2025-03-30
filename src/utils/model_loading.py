@@ -19,11 +19,26 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
-def load_model(model_name: str, pretrained: str | None = None, weight_init: str | None = None) -> BaseNet:
-    """Initialize model and load weights if pretrained. Optionally perform weight initialization."""
+def load_model(model_name: str | None = None, pretrained: str | None = None, weight_init: str | None = None) -> BaseNet:
+    """Initialize model and load weights from pretrained path or initialize weights."""
     model: BaseNet
+
     if pretrained and weight_init:
-        raise ValueError('Cannot specify both pretrained and weight_init')
+        raise ValueError('Cannot specify both pretrained and weight_init.')
+
+    # Infer model_name from the pretrained path if not explicitly provided.
+    if model_name is None:
+        if pretrained is None:
+            raise ValueError('Either model_name or pretrained path must be provided.')
+        # Attempt to infer model type from the pretrained path.
+        if 'dt_net' in pretrained:
+            model_name = 'dt_net'
+        elif 'it_net' in pretrained:
+            model_name = 'it_net'
+        elif 'pi_net' in pretrained:
+            model_name = 'pi_net'
+        else:
+            raise ValueError('Could not infer model type from pretrained path.')
 
     # Initialize model
     if 'dt_net' in model_name:
