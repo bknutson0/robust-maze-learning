@@ -12,7 +12,7 @@ def main() -> None:
     # test_name = '2025-03-27_16:35:05'
     # test_name = '2025-03-29_15:40:05'
     # test_name = '2025-03-29_16:19:02'
-    test_name = '2025-03-30_00:37:37'
+    test_name = '2025-03-30_11:45:35'
 
     df = pd.read_csv(f'outputs/tests/{test_name}/results.csv')
     # print(df.head(20))

@@ -58,7 +58,7 @@ def plot_test_accuracies(test_name: str, plot_type: str, filters: dict[str, Any]
         small_value = 1e-3
         color_mapping_values = [tp if tp > 0 else small_value for tp in train_percolations]
         cmap = cm.get_cmap('plasma', len(train_percolations))
-        norm = mcolors.Normalize(vmin=min(color_mapping_values), vmax=max(color_mapping_values))
+        norm = mcolors.LogNorm(vmin=min(color_mapping_values), vmax=max(color_mapping_values))
 
         # Generate colors using the modified mapping list
         colors = [cmap(norm(tp if tp > 0 else small_value)) for tp in train_percolations]

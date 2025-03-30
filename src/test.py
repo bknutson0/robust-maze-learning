@@ -1,5 +1,6 @@
 from src.utils.config import TestParameters
 from src.utils.model_loading import get_all_model_names
+from src.utils.testing import test
 
 
 def main() -> None:
@@ -34,14 +35,14 @@ def main() -> None:
     test_params = TestParameters()
     test_params.model_name = sorted(model_names)
     test_params.maze_size = [9, 11, 13, 15, 17, 19, 21]
-    test_params.num_mazes = 1000
+    test_params.num_mazes = 100
     test_params.iters = [30, 60, 100, 200, 300]
 
     # Perform test
     print('Testing the following models:')
     for name in test_params.model_name:
         print(name)
-    # test(test_params)
+    test(test_params)
 
 
 if __name__ == '__main__':

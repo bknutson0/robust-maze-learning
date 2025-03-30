@@ -62,7 +62,7 @@ def load_model(model_name: str | None = None, pretrained: str | None = None, wei
     elif weight_init:
         initialize_weights(model, weight_init)
 
-    logger.info(f'Loaded {model_name} to {DEVICE}')
+    logger.info(f'Loaded model: {model_name} from {pretrained if pretrained else "scratch"} to device: {DEVICE}')
     return model
 
 
