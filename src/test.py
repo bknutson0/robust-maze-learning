@@ -1,6 +1,5 @@
 from src.utils.config import TestParameters
 from src.utils.model_loading import get_all_model_names
-from src.utils.testing import test
 
 
 def main() -> None:
@@ -42,7 +41,7 @@ def main() -> None:
     print('Testing the following models:')
     for name in test_params.model_name:
         print(name)
-    test(test_params)
+    # test(test_params)
 
 
 if __name__ == '__main__':

@@ -37,22 +37,6 @@ def load_model(model_name: str, pretrained: str | None = None, weight_init: str 
 
     model.to(DEVICE)
 
-    for param in model.parameters():
-        param.data.zero_()
-
-    # Initialize model based on its name.
-    if 'dt_net' in model_name:
-        model = DTNet()
-    elif 'it_net' in model_name:
-        model = ITNet()
-    elif model_name == 'pi_net':
-        raise NotImplementedError('PINet model not implemented yet')
-    else:
-        raise ValueError(f'Unknown model name: {model_name}')
-
-    model.to(DEVICE)
-    model.eval()
-
     if pretrained:
         # Load state dict and extract 'net' if available.
         state_dict = torch.load(pretrained, map_location=DEVICE, weights_only=True)
