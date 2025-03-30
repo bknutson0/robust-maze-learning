@@ -190,7 +190,7 @@ def train(hyperparams: Hyperparameters) -> float:
             json.dump(results, f, indent=4)
 
         # Save checkpoints
-        if (epoch + 1) % hyperparams.checkpoint_freq == 0:
+        if (hyperparams.checkpoint_freq is not None) and (epoch + 1) % hyperparams.checkpoint_freq == 0:
             checkpoint_dir = os.path.join(run_dir, 'checkpoints')
             os.makedirs(checkpoint_dir, exist_ok=True)
             checkpoint_file = os.path.join(run_dir, 'checkpoints', f'epoch_{epoch + 1}.pth')

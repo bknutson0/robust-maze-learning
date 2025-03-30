@@ -55,7 +55,7 @@ class Hyperparameters:
     train_size: float = 1.0 - validation_size
     batch_size: int = 32
     epochs: int = 100
-    checkpoint_freq: int = 10
+    checkpoint_freq: int | None = None
     learning_rate: float = 0.0001
     grad_clip: float | None = 1.0
     optimizer_name: str = 'AdamW'
