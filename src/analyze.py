@@ -8,8 +8,10 @@ def main() -> None:
     # Random initial weights without progressive learning dt-net models (03-01 to 03-03)
     # test_name = '2025-03-04_12:26:21'
     # Random initial weights and progressive learning dt-net models (03-11 to 03-13)
-    test_name = '2025-03-26_18:12:08'
+    # test_name = '2025-03-26_18:12:08'
     # test_name = '2025-03-27_16:35:05'
+    test_name = '2025-03-29_15:40:05'
+    # test_name = '2025-03-29_16:19:02'
 
     df = pd.read_csv(f'outputs/tests/{test_name}/results.csv')
     # print(df.head(20))
