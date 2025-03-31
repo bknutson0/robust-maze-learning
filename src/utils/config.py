@@ -5,6 +5,7 @@ from dataclasses import asdict, dataclass, field
 from typing import Any
 
 import torch
+from matplotlib import pyplot as plt
 
 # Device configuration
 # Prioritize PREFERRED_CUDA > CUDA > MPS > CPU
@@ -134,3 +135,31 @@ class TestParameters:
         os.makedirs(os.path.dirname(path), exist_ok=True)
         with open(path, 'w') as f:
             json.dump(asdict(self), f, indent=4)
+
+
+# Analysis plotting configuration
+@dataclass
+class PlotConfig:
+    """Configuration for plotting analysis results."""
+
+    font_size: int = 14
+    axes_title_size: int = 18
+    axes_title_weight: str = 'bold'
+    axes_label_size: int = 16
+    axes_label_weight: str = 'bold'
+    legend_title_fontsize: int = 16
+    legend_title_weight: str = 'bold'
+    subplot_title_size: int = 12
+
+    def apply(self) -> None:
+        """Apply these settings to Matplotlib's rcParams."""
+        plt.rcParams.update(
+            {
+                'font.size': self.font_size,
+                'axes.titlesize': self.axes_title_size,
+                'axes.titleweight': self.axes_title_weight,
+                'axes.labelsize': self.axes_label_size,
+                'axes.labelweight': self.axes_label_weight,
+                'legend.title_fontsize': self.legend_title_fontsize,
+            }
+        )

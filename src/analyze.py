@@ -1,21 +1,30 @@
 import pandas as pd
 
 from src.utils.analysis import plot_test_accuracies
+from src.utils.config import PlotConfig
+
+# Instantiate and apply the plot configuration
+plot_config = PlotConfig()
+plot_config.apply()
 
 
 def main() -> None:
     """Analyze test results."""
+    # dt_net
     # Random initial weights without progressive learning dt-net models (03-01 to 03-03)
     # test_name = '2025-03-04_12:26:21'
     # Random initial weights and progressive learning dt-net models (03-11 to 03-13)
-    # test_name = '2025-03-26_18:12:08'
+    test_name = '2025-03-30_18:36:53'
+
+    # it_net
     # test_name = '2025-03-27_16:35:05'
     # test_name = '2025-03-29_15:40:05'
     # test_name = '2025-03-29_16:19:02'
-    test_name = '2025-03-30_11:45:35'
+    # test_name = '2025-03-30_11:45:35' # Contractive it_net and num_mazes = 100
+    # test_name = '2025-03-30_12:58:18'  # Contractive it_net and num_mazes = 1000
 
     df = pd.read_csv(f'outputs/tests/{test_name}/results.csv')
-    # print(df.head(20))
+    print(df.head(20))
     # Print unique values in each column
     for column in df.columns:
         unique_values = df[column].unique()
@@ -27,12 +36,30 @@ def main() -> None:
     #     train_percolation = df[df['model_name'] == model_name]['train_percolation'].unique()
     #     print(f'{model_name = }, {train_percolation[0] = }')
 
-    plot_test_accuracies(
-        test_name,
-        'acc_vs_perc',
-        filters={'test_iter': 100, 'test_maze_size': 9},
-        # filters={'model_name': 'models/dt_net/20250211_174547/best.pth', 'test_iter': 30},
-    )
+    # # Plot test accuracy versus test percolation for models trained with different percolations
+    # plot_test_accuracies(
+    #     test_name,
+    #     'acc_vs_perc',
+    #     filters={
+    #         'test_iter': 300,
+    #         'test_maze_size': 9,
+    #         'train_percolation': [0.0, 0.2, 0.4, 0.6, 0.8, 0.99],
+    #     },
+    # )
+
+    # # Plot test accuracy heatmap versus maze size and test percolation for models trained with different percolations
+    # for percolation in [0.0, 0.001, 0.03, 0.01, 0.03, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 0.99]:
+    #     plot_test_accuracies(
+    #         test_name,
+    #         'acc_vs_size_perc',
+    #         filters={
+    #             'test_iter': 300,
+    #             'train_percolation': percolation,
+    #         },
+    #     )
+
+    # Plot overall test accuracy for each model
+    plot_test_accuracies(test_name, 'overall_acc_vs_perc', filters={'test_iter': 300})
 
     # #Plot mazes
     # params = Hyperparameters()
