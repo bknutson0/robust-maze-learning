@@ -62,9 +62,9 @@ def plot_test_accuracies(test_names: str | list[str], plot_type: str, filters: d
             model_names = df_temp['model_name'].unique()
             # If 'dt_net' is in every model name, label it as 'dt_net', otherwise label it as 'it_net'.
             if all('dt_net' in model_name for model_name in model_names):
-                model_label = 'dt_net'
+                model_label = 'RNN'
             elif all('it_net' in model_name for model_name in model_names):
-                model_label = 'it_net'
+                model_label = 'INN'
             else:
                 raise ValueError('Model names contain both dt_net and it_net. Unable to determine model type.')
 
@@ -94,16 +94,16 @@ def plot_test_accuracies(test_names: str | list[str], plot_type: str, filters: d
                 linestyle=linestyle,
                 linewidth=2,
                 markersize=6,
-                label=f'{model_label} (iter {test_iter})',
+                label=f'{model_label}',
                 color=cmap(norm(test_iter)),
             )
 
         plt.xlabel('Train Percolation')
-        plt.xlim(0, 1)
+        plt.xlim(0, 0.01)
         plt.ylabel('Overall Test Accuracy')
         plt.ylim(0, 1)
-        plt.title('Overall Test Accuracy vs Train Percolation', fontsize=config.font_size * 1.2)
-        plt.legend(title='Tests', loc='upper left', bbox_to_anchor=(1.05, 1))
+        # plt.title('Overall Test Accuracy vs Train Percolation', fontsize=config.font_size * 1.2)
+        plt.legend(loc='upper left', bbox_to_anchor=(1.05, 1))
 
         # Save the combined plot in each test folder
         for test_name in test_names:
@@ -277,7 +277,7 @@ def plot_test_accuracies(test_names: str | list[str], plot_type: str, filters: d
                     clip_on=False,  # Allow marker to go beyond axis boundaries
                     label='training distribution',
                 )
-
+                ax.legend()
                 plt.tight_layout(rect=(0.0, 0.0, 1.0, 1.0))
                 # ax.invert_yaxis()
                 out_filename = (

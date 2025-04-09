@@ -46,16 +46,16 @@ def main() -> None:
     #     },
     # )
 
-    # Plot test accuracy heatmap versus maze size and test percolation for models trained with different percolations
-    for percolation in [0.0, 0.001, 0.03, 0.01, 0.03, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 0.99]:
-        plot_test_accuracies(
-            dt_net_test_name,
-            'acc_vs_size_perc',
-            filters={
-                'test_iter': 300,
-                'train_percolation': percolation,
-            },
-        )
+    # # Plot test accuracy heatmap versus maze size and test percolation for models trained with different percolations
+    # for percolation in [0.0, 0.001, 0.003, 0.01, 0.03, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 0.99]:
+    #     plot_test_accuracies(
+    #         it_net_test_name,
+    #         'acc_vs_size_perc',
+    #         filters={
+    #             'test_iter': 30,
+    #             'train_percolation': percolation,
+    #         },
+    #     )
 
     # Plot overall test accuracy for each model
     plot_test_accuracies(test_names, 'overall_acc_vs_perc', filters={'test_iter': 30})
