@@ -9,18 +9,18 @@ def main() -> None:
 
     # Modifications for training it_net
     hyperparams.model_name = 'it_net'
-    hyperparams.pretrained = 'models/it_net/2025-03-23_12:27:31/checkpoints/epoch_10.pth'
+    hyperparams.pretrained = None  #'models/it_net/2025-03-23_12:27:31/checkpoints/epoch_10.pth'
     hyperparams.iters = 100
     hyperparams.num_mazes = int(1e5)
-    hyperparams.random_iters = True
+    hyperparams.random_iters = False
     hyperparams.contraction = 1.0
     hyperparams.train_jfb = True
     hyperparams.learning_rate = 1e-4
     hyperparams.batch_size = 32
     hyperparams.grad_clip = None
     hyperparams.tolerance = 1e-1
-    hyperparams.warmup_epochs = 0
-    hyperparams.warmup_iters = 10
+    hyperparams.warmup_epochs = 10
+    hyperparams.warmup_iters = 30
     hyperparams.patience = 10
 
     # Define percolation values for fine-tuning

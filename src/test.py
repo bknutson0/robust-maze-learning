@@ -34,7 +34,7 @@ def main() -> None:
     # Define test parameters
     test_params = TestParameters()
     test_params.model_name = sorted(model_names)
-    test_params.maze_size = [9, 11, 13, 15, 17, 19, 21]
+    test_params.maze_size = [5, 7, 9, 11, 13, 15, 17, 19, 21, 23, 25, 27, 29]
     test_params.num_mazes = 1000
     test_params.iters = [30, 60, 100, 200, 300]
 
