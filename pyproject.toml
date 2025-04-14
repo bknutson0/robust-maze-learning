@@ -13,6 +13,7 @@ dependencies = [
     "torch>=2.6.0",
     "scipy>=1.15.1",
     "maze-dataset>=1.3.1",
+	"tensorboard>=2.18.0",
 ]
 
 [dependency-groups]
@@ -25,9 +26,6 @@ dev = [
 	"pytest>=8.3.4",
 	# coverage
 	"pytest-cov>=6.0.0",
-	#"coverage-badge",
-	# logging
-	"tensorboard>=2.18.0",
 ]
 
 [tool.ruff]
@@ -48,7 +46,7 @@ dev = [
 		"SIM",    # flake8-simplify: detect redundant expressions
 		"ANN",    # flake8-annotations: check for type hints
 		"S",      # flake8-bandit: test for security
-		#"FIX002", # flake8-fixme: check for TODO
+		"FIX002", # flake8-fixme: check for TODO
 		#"PGH003", # pygrep-hooks: check for 'type: ignore' comments
 		#"PGH004"  # pygrep-hooks: check for 'noqa' comments
 	]

@@ -1845,6 +1845,7 @@ dependencies = [
     { name = "maze-dataset" },
     { name = "numpy" },
     { name = "scipy" },
+    { name = "tensorboard" },
     { name = "torch" },
 ]
 
@@ -1854,7 +1855,6 @@ dev = [
     { name = "pytest" },
     { name = "pytest-cov" },
     { name = "ruff" },
-    { name = "tensorboard" },
 ]
 
 [package.metadata]
@@ -1862,6 +1862,7 @@ requires-dist = [
     { name = "maze-dataset", git = "https://github.com/understanding-search/maze-dataset?branch=dev" },
     { name = "numpy", specifier = "==1.26.4" },
     { name = "scipy", specifier = ">=1.15.1" },
+    { name = "tensorboard", specifier = ">=2.18.0" },
     { name = "torch", specifier = ">=2.6.0" },
 ]
 
@@ -1871,7 +1872,6 @@ dev = [
     { name = "pytest", specifier = ">=8.3.4" },
     { name = "pytest-cov", specifier = ">=6.0.0" },
     { name = "ruff", specifier = ">=0.9.6" },
-    { name = "tensorboard", specifier = ">=2.18.0" },
 ]
 
 [[package]]
