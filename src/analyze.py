@@ -21,7 +21,7 @@ def main() -> None:
     # it_net_test_name = '2025-03-30_11:45:35' # Contractive it_net and num_mazes = 100
     it_net_test_name = '2025-03-30_12:58:18'  # Contractive it_net and num_mazes = 1000
 
-    # df = pd.read_csv(f'outputs/tests/{test_name}/results.csv')
+    # df = pd.read_csv(f'outputs/tests/{it_net_test_name}/results.csv')
     # print(df.head(20))
     # # Print unique values in each column
     # for column in df.columns:
@@ -58,7 +58,11 @@ def main() -> None:
     #     )
 
     # Plot overall test accuracy for each model
-    plot_test_accuracies(dt_net_test_name, 'acc_vs_size_perc', filters={'model_name': 'dt_net', 'test_iter': 30})
+    plot_test_accuracies(
+        it_net_test_name,
+        'acc_vs_size_perc',
+        filters={'train_percolation': [0.0, 0.001, 0.01, 0.1, 0.5, 0.99], 'test_iter': 300},
+    )
 
     # #Plot mazes
     # params = Hyperparameters()

@@ -142,14 +142,14 @@ class TestParameters:
 class PlotConfig:
     """Configuration for plotting analysis results."""
 
-    font_size: int = 14
-    axes_title_size: int = 18
+    font_size: int = 30
+    axes_title_size: int = 30
     axes_title_weight: str = 'bold'
-    axes_label_size: int = 16
+    axes_label_size: int = 30
     axes_label_weight: str = 'bold'
-    legend_title_fontsize: int = 16
+    legend_title_fontsize: int = 30
     legend_title_weight: str = 'bold'
-    subplot_title_size: int = 12
+    subplot_title_size: int = 30
 
     def apply(self) -> None:
         """Apply these settings to Matplotlib's rcParams."""

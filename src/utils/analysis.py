@@ -4,6 +4,8 @@ from typing import Any
 
 import matplotlib.cm as cm
 import matplotlib.colors as mcolors
+import matplotlib.lines as mlines
+import matplotlib.patches as mpatches
 import matplotlib.pyplot as plt
 import pandas as pd
 import torch
@@ -165,27 +167,19 @@ def plot_test_accuracies(test_names: str | list[str], plot_type: str, filters: d
                     plt.close()
 
         elif plot_type == 'acc_vs_size_perc':
-            # Gather heatmap data for each test into a summary list.
             summary_list = []
             for test_name in test_names:
                 df = pd.read_csv(f'outputs/tests/{test_name}/results.csv')
                 df = filter_dataframe(df, filters)
 
-                # Validate required axes and allowed filters.
-                required_axes = {'test_maze_size', 'test_percolation'}
-                for col in required_axes:
+                # Ensure required axes have multiple unique values.
+                for col in ['test_maze_size', 'test_percolation']:
                     if df[col].nunique() <= 1:
                         raise ValueError(f"Column '{col}' must have multiple unique values for a heatmap.")
-                allowed_filters = {'model_name', 'test_iter'}
-                filters = filters or {}
-                for col, value in filters.items():
-                    if col not in df.columns:
-                        raise ValueError(f"Invalid column: '{col}' does not exist in the dataframe.")
-                    if col in required_axes:
-                        raise ValueError(f"Cannot filter on required axis column: '{col}'")
-                    if col in allowed_filters and value not in df[col].unique():
-                        raise ValueError(f"Invalid value for '{col}': {value}. Must be one of {df[col].unique()}.")
 
+                # Only require a unique test_iter via filters.
+                allowed_filters = {'test_iter'}
+                filters = filters or {}
                 multi_value_cols = {col for col in allowed_filters if df[col].nunique() > 1}
                 if multi_value_cols - filters.keys():
                     raise ValueError(
@@ -194,83 +188,92 @@ def plot_test_accuracies(test_names: str | list[str], plot_type: str, filters: d
                     )
 
                 filtered_df = filter_dataframe(df, filters)
+                # Iterate over each unique model.
+                for model in filtered_df['model_name'].unique():
+                    df_model = filtered_df[filtered_df['model_name'] == model]
+                    # Create a short label for the model.
+                    if 'dt_net' in model:
+                        label = 'dt_net'
+                    elif 'it_net' in model:
+                        label = 'it_net'
+                    else:
+                        label = model
 
-                model_names = filtered_df['model_name'].unique()
-                if len(model_names) != 1:
-                    raise ValueError(f'Expected exactly one model_name after filtering, but got {len(model_names)}.')
-                model_name = model_names[0]
-                if 'dt_net' in model_name:
-                    model_name = 'dt_net'
-                elif 'it_net' in model_name:
-                    model_name = 'it_net'
-                else:
-                    raise ValueError(f'Unexpected model_name found: {model_name}')
+                    train_perc_vals = df_model['train_percolation'].unique()
+                    if len(train_perc_vals) != 1:
+                        raise ValueError(f'Expected single train_percolation for {model}, got {train_perc_vals}.')
+                    train_perc = train_perc_vals[0]
 
-                train_percolation_vals = filtered_df['train_percolation'].unique()
-                if len(train_percolation_vals) != 1:
-                    raise ValueError(
-                        f'Expected single train_percolation value for {model_name}, got {train_percolation_vals}.'
+                    test_iter_vals = df_model['test_iter'].unique()
+                    if len(test_iter_vals) != 1:
+                        raise ValueError(f'Expected single test_iter for {model}, got {test_iter_vals}.')
+                    test_iter = test_iter_vals[0]
+
+                    heatmap_data = df_model.groupby(['test_percolation', 'test_maze_size'])['correct'].mean().unstack()
+                    x_labels = heatmap_data.columns.values
+                    y_labels = heatmap_data.index.values
+                    heatmap_values = heatmap_data.values
+
+                    dx = (x_labels[-1] - x_labels[0]) / (len(x_labels) - 1) if len(x_labels) > 1 else 1
+                    x_extent = [x_labels[0] - dx / 2, x_labels[-1] + dx / 2]
+                    extent = [x_extent[0], x_extent[1], y_labels[0], y_labels[-1]]
+
+                    train_maze_size_vals = df_model['train_maze_size'].unique()
+                    if len(train_maze_size_vals) != 1:
+                        raise ValueError(f'Expected single train_maze_size for {model}, got {train_maze_size_vals}.')
+                    train_maze_size = train_maze_size_vals[0]
+
+                    summary_list.append(
+                        {
+                            'test_name': test_name,
+                            'train_percolation': train_perc,
+                            'test_iter': test_iter,
+                            'model_label': label,
+                            'heatmap_values': heatmap_values,
+                            'x_labels': x_labels,
+                            'y_labels': y_labels,
+                            'extent': extent,
+                            'train_maze_size': train_maze_size,
+                        }
                     )
-                train_percolation = train_percolation_vals[0]
 
-                test_iter_vals = filtered_df['test_iter'].unique()
-                if len(test_iter_vals) != 1:
-                    raise ValueError(f'Expected single test_iter value for {model_name}, got {test_iter_vals}.')
-                test_iter = test_iter_vals[0]
+            # Ensure that all summary plots use the same model type and iteration.
+            model_types = list({data['model_label'] for data in summary_list})
+            if len(model_types) != 1:
+                raise ValueError(f'Expected exactly one model type across all plots, found: {model_types}')
+            test_iters = list({data['test_iter'] for data in summary_list})
+            if len(test_iters) != 1:
+                raise ValueError(f'Expected exactly one test_iter across all plots, found: {test_iters}')
 
-                heatmap_data = filtered_df.groupby(['test_percolation', 'test_maze_size'])['correct'].mean().unstack()
-                x_labels = heatmap_data.columns.values
-                y_labels = heatmap_data.index.values
-                heatmap_values = heatmap_data.values
+            common_model_type = model_types[0]
+            common_test_iter = test_iters[0]
 
-                dx = (x_labels[-1] - x_labels[0]) / (len(x_labels) - 1) if len(x_labels) > 1 else 1
-                x_extent = [x_labels[0] - dx / 2, x_labels[-1] + dx / 2]
-                extent = [x_extent[0], x_extent[1], y_labels[0], y_labels[-1]]
-
-                train_maze_size_vals = filtered_df['train_maze_size'].unique()
-                if len(train_maze_size_vals) != 1:
-                    raise ValueError(
-                        f'Expected single train_maze_size value for {model_name}, got {train_maze_size_vals}.'
-                    )
-                train_maze_size = train_maze_size_vals[0]
-
-                # Store the data for this test.
-                summary_list.append(
-                    {
-                        'test_name': test_name,
-                        'train_percolation': train_percolation,
-                        'test_iter': test_iter,
-                        'model_name': model_name,
-                        'heatmap_values': heatmap_values,
-                        'x_labels': x_labels,
-                        'y_labels': y_labels,
-                        'extent': extent,
-                        'train_maze_size': train_maze_size,
-                    }
-                )
-
-            # Order the summary list by training percolation (ascending)
+            # Order the summary list by training percolation (left-to-right).
             summary_list.sort(key=lambda d: d['train_percolation'])
-
-            # Create a summary figure with one row of subplots.
             n_plots = len(summary_list)
             fig, axes = plt.subplots(1, n_plots, figsize=(8 * n_plots, 6))
             if n_plots == 1:
                 axes = [axes]
-            for ax, data in zip(axes, summary_list, strict=False):
-                cax = ax.imshow(
+
+            last_im = None
+            for i, (ax, data) in enumerate(zip(axes, summary_list, strict=False)):
+                im = ax.imshow(
                     data['heatmap_values'], cmap='coolwarm', aspect='auto', origin='lower', extent=tuple(data['extent'])
                 )
+                last_im = im  # Save the last mappable for the colorbar.
                 ax.set_xticks(data['x_labels'])
                 ax.set_xticklabels(data['x_labels'])
                 ax.set_yticks(data['y_labels'])
-                ax.set_yticklabels(data['y_labels'])
+                # Only the leftmost plot retains y tick labels.
+                if i == 0:
+                    ax.set_yticklabels(data['y_labels'])
+                    ax.set_ylabel('Test Percolation')
+                else:
+                    ax.tick_params(labelleft=False)
+                    ax.set_ylabel('')
                 ax.set_xlabel('Test Maze Size')
-                ax.set_ylabel('Test Percolation')
-                title_text = (
-                    f'{data["model_name"]} | Train Perc: {data["train_percolation"]:.3f} | Iter: {data["test_iter"]}'
-                )
-                ax.set_title(title_text)
+                # Title now only shows the training percolation.
+                ax.set_title(f'Train Perc: {data["train_percolation"]:.3f}')
                 ax.scatter(
                     data['train_maze_size'],
                     data['train_percolation'],
@@ -281,12 +284,36 @@ def plot_test_accuracies(test_names: str | list[str], plot_type: str, filters: d
                     linewidths=1.5,
                     zorder=4,
                     clip_on=False,
-                    label='training distribution',
                 )
-                ax.legend()
-            fig.colorbar(cax, ax=axes, orientation='vertical', label='Test Accuracy')
-            plt.tight_layout()
-            summary_filename = 'outputs/tests/acc_vs_size_perc_summary.pdf'
+
+            # Adjust subplots so that there's less whitespace between them and to the right.
+            fig.subplots_adjust(wspace=0.03, right=0.82)
+
+            # Add the color bar: placed just right of the subplots.
+            # Adjusted position: left edge at 0.83, with the desired vertical and height settings.
+            cbar_ax = fig.add_axes((0.83, 0.1, 0.01, 0.6))
+            if last_im is None:
+                raise ValueError("No heatmap was created, so 'last_im' is None.")
+            fig.colorbar(last_im, cax=cbar_ax, label='Test Accuracy')
+
+            # Create a legend using invisible patches for model type and iterations.
+            # Add a line for the training distribution.
+
+            l_distribution = mlines.Line2D(
+                [], [], marker='*', color='gold', linestyle='None', markersize=10, label='Training distribution'
+            )
+            l_model = mpatches.Patch(color='none', label=f'Model type: {common_model_type}')
+            l_iter = mpatches.Patch(color='none', label=f'Iterations: {common_test_iter}')
+
+            # Place the legend directly above the color bar.
+            fig.legend(
+                handles=[l_distribution, l_model, l_iter],
+                loc='lower center',
+                bbox_to_anchor=(0.848, 0.70),
+            )
+
+            # Save the figure without using tight_layout (to avoid layout warnings).
+            summary_filename = f'outputs/tests/{test_name}/acc_vs_size_perc.pdf'
             plt.savefig(summary_filename, bbox_inches='tight')
             logger.info(f'Saved summary heatmap to {summary_filename}')
             plt.close()
