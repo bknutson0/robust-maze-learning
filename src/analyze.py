@@ -34,7 +34,7 @@ def main() -> None:
     #     train_percolation = df[df['model_name'] == model_name]['train_percolation'].unique()
     #     print(f'{model_name = }, {train_percolation[0] = }')
 
-    test_names = [dt_net_test_name, it_net_test_name]
+    # test_names = [dt_net_test_name, it_net_test_name]
     # # Plot test accuracy versus test percolation for models trained with different percolations
     # plot_test_accuracies(
     #     it_net_test_name,
@@ -58,7 +58,7 @@ def main() -> None:
     #     )
 
     # Plot overall test accuracy for each model
-    plot_test_accuracies(test_names, 'overall_acc_vs_perc', filters={'test_iter': 30})
+    plot_test_accuracies(dt_net_test_name, 'acc_vs_size_perc', filters={'model_name': 'dt_net', 'test_iter': 30})
 
     # #Plot mazes
     # params = Hyperparameters()
