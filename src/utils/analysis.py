@@ -4,8 +4,6 @@ from typing import Any
 
 import matplotlib.cm as cm
 import matplotlib.colors as mcolors
-import matplotlib.lines as mlines
-import matplotlib.patches as mpatches
 import matplotlib.pyplot as plt
 import pandas as pd
 import torch
@@ -261,13 +259,19 @@ def plot_test_accuracies(test_names: str | list[str], plot_type: str, filters: d
                     data['heatmap_values'], cmap='coolwarm', aspect='auto', origin='lower', extent=tuple(data['extent'])
                 )
                 last_im = im  # Save the last mappable for the colorbar.
-                ax.set_xticks(data['x_labels'])
-                ax.set_xticklabels(data['x_labels'])
+                xticks = data['x_labels']
+                ax.set_xticks(xticks)
+                ax.set_xticklabels(xticks.astype(str))  # turn them into strings
+
+                # now turn off visibility of the odd ones:
+                for lbl in ax.xaxis.get_ticklabels()[1::2]:
+                    lbl.set_visible(False)
                 ax.set_yticks(data['y_labels'])
                 # Only the leftmost plot retains y tick labels.
                 if i == 0:
                     ax.set_yticklabels(data['y_labels'])
-                    ax.set_ylabel('Test Percolation')
+                    model_type = 'IT-Net' if common_model_type == 'it_net' else 'DT-Net'
+                    ax.set_ylabel(f'{model_type} \n Test Percolation')
                 else:
                     ax.tick_params(labelleft=False)
                     ax.set_ylabel('')
@@ -289,28 +293,28 @@ def plot_test_accuracies(test_names: str | list[str], plot_type: str, filters: d
             # Adjust subplots so that there's less whitespace between them and to the right.
             fig.subplots_adjust(wspace=0.03, right=0.82)
 
-            # Add the color bar: placed just right of the subplots.
-            # Adjusted position: left edge at 0.83, with the desired vertical and height settings.
-            cbar_ax = fig.add_axes((0.83, 0.1, 0.01, 0.6))
-            if last_im is None:
-                raise ValueError("No heatmap was created, so 'last_im' is None.")
-            fig.colorbar(last_im, cax=cbar_ax, label='Test Accuracy')
+            # # Add the color bar: placed just right of the subplots.
+            # # Adjusted position: left edge at 0.83, with the desired vertical and height settings.
+            # cbar_ax = fig.add_axes((0.83, 0.1, 0.01, 0.6))
+            # if last_im is None:
+            #     raise ValueError("No heatmap was created, so 'last_im' is None.")
+            # fig.colorbar(last_im, cax=cbar_ax, label='Test Accuracy')
 
-            # Create a legend using invisible patches for model type and iterations.
-            # Add a line for the training distribution.
+            # # Create a legend using invisible patches for model type and iterations.
+            # # Add a line for the training distribution.
 
-            l_distribution = mlines.Line2D(
-                [], [], marker='*', color='gold', linestyle='None', markersize=10, label='Training distribution'
-            )
-            l_model = mpatches.Patch(color='none', label=f'Model type: {common_model_type}')
-            l_iter = mpatches.Patch(color='none', label=f'Iterations: {common_test_iter}')
+            # l_distribution = mlines.Line2D(
+            #     [], [], marker='*', color='gold', linestyle='None', markersize=10, label='Training distribution'
+            # )
+            # l_model = mpatches.Patch(color='none', label=f'Model type: {common_model_type}')
+            # l_iter = mpatches.Patch(color='none', label=f'Iterations: {common_test_iter}')
 
-            # Place the legend directly above the color bar.
-            fig.legend(
-                handles=[l_distribution, l_model, l_iter],
-                loc='lower center',
-                bbox_to_anchor=(0.848, 0.70),
-            )
+            # # Place the legend directly above the color bar.
+            # fig.legend(
+            #     handles=[l_distribution, l_model, l_iter],
+            #     loc='lower center',
+            #     bbox_to_anchor=(0.848, 0.70),
+            # )
 
             # Save the figure without using tight_layout (to avoid layout warnings).
             summary_filename = f'outputs/tests/{test_name}/acc_vs_size_perc.pdf'

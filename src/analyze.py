@@ -12,14 +12,15 @@ def main() -> None:
     # Random initial weights without progressive learning dt-net models (03-01 to 03-03)
     # dt_net_test_name = '2025-03-04_12:26:21'
     # Random initial weights and progressive learning dt-net models (03-11 to 03-13)
-    dt_net_test_name = '2025-03-30_18:36:53'
+    # dt_net_test_name = '2025-03-30_18:36:53'
+    dt_net_test_name = '2025-04-16_17:27:21'  # larger range of maze sizes
 
     # it_net
     # it_net_test_name = '2025-03-27_16:35:05'
     # it_net_test_name = '2025-03-29_15:40:05'
     # it_net_test_name = '2025-03-29_16:19:02'
     # it_net_test_name = '2025-03-30_11:45:35' # Contractive it_net and num_mazes = 100
-    it_net_test_name = '2025-03-30_12:58:18'  # Contractive it_net and num_mazes = 1000
+    it_net_test_name = '2025-04-16_17:27:53'  # larger range of maze sizes
 
     # df = pd.read_csv(f'outputs/tests/{it_net_test_name}/results.csv')
     # print(df.head(20))
@@ -34,7 +35,7 @@ def main() -> None:
     #     train_percolation = df[df['model_name'] == model_name]['train_percolation'].unique()
     #     print(f'{model_name = }, {train_percolation[0] = }')
 
-    # test_names = [dt_net_test_name, it_net_test_name]
+    test_names = [dt_net_test_name, it_net_test_name]
     # # Plot test accuracy versus test percolation for models trained with different percolations
     # plot_test_accuracies(
     #     it_net_test_name,
@@ -59,9 +60,9 @@ def main() -> None:
 
     # Plot overall test accuracy for each model
     plot_test_accuracies(
-        it_net_test_name,
+        dt_net_test_name,
         'acc_vs_size_perc',
-        filters={'train_percolation': [0.0, 0.001, 0.01, 0.1, 0.5, 0.99], 'test_iter': 300},
+        filters={'train_percolation': [0.0, 0.001, 0.01, 0.1, 0.5, 0.99], 'test_iter': 200},
     )
 
     # #Plot mazes
