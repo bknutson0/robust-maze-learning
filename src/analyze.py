@@ -60,7 +60,7 @@ def main() -> None:
 
     # Plot overall test accuracy for each model
     plot_test_accuracies(
-        dt_net_test_name,
+        it_net_test_name,
         'acc_vs_size_perc',
         filters={'train_percolation': [0.0, 0.001, 0.01, 0.1, 0.5, 0.99], 'test_iter': 200},
     )
