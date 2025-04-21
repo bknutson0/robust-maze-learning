@@ -8,6 +8,7 @@ from torch import nn
 
 from src.models.base_net import BaseNet
 from src.models.dt_net import DTNet
+from src.models.ff_net import FFNet
 from src.models.it_net import ITNet
 from src.utils.config import DEVICE, LOGGING_LEVEL, Hyperparameters
 
@@ -35,18 +36,18 @@ def load_model(model_name: str | None = None, pretrained: str | None = None, wei
             model_name = 'dt_net'
         elif 'it_net' in pretrained:
             model_name = 'it_net'
-        elif 'pi_net' in pretrained:
-            model_name = 'pi_net'
+        elif 'ff_net' in pretrained:
+            model_name = 'ff_net'
         else:
             raise ValueError('Could not infer model type from pretrained path.')
 
     # Initialize model
     if 'dt_net' in model_name:
         model = DTNet()
-    elif model_name == 'pi_net':
-        raise NotImplementedError('PINet model not implemented yet')
     elif 'it_net' in model_name:
         model = ITNet()
+    elif 'ff_net' in model_name:
+        model = FFNet()
     else:
         raise ValueError(f'Unknown model name: {model_name}')
 

@@ -8,10 +8,10 @@ def main() -> None:
     hyperparams = Hyperparameters()
 
     # Modifications for training it_net
-    hyperparams.model_name = 'dt_net'
+    hyperparams.model_name = 'ff_net'
     hyperparams.pretrained = None  #'models/it_net/2025-03-23_12:27:31/checkpoints/epoch_10.pth'
     hyperparams.iters = 30
-    hyperparams.num_mazes = int(1e5)
+    hyperparams.num_mazes = int(1e3)  # TODO: change back to 1e5
     hyperparams.random_iters = False
     hyperparams.contraction = None
     hyperparams.train_jfb = False

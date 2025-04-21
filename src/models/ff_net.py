@@ -34,20 +34,20 @@ class FFNet(BaseNet):
 
     def input_to_latent(self, inputs: Tensor) -> Tensor:
         """Compute the latent representation from the inputs."""
-        return torch.tensor(self.projection(inputs))
+        return self.projection(inputs)  # type: ignore
 
     def latent_forward(
         self, latents: Tensor, inputs: Tensor, iters: int | list[int] = 1, tolerance: float | None = None
     ) -> Tensor:
         """Perform the forward pass through the feedforward blocks."""
-        return torch.tensor(self.feedforward_blocks(latents))
+        return self.feedforward_blocks(latents)  # type: ignore
 
     def latent_to_output(self, latents: Tensor | list[Tensor]) -> Tensor | list[Tensor]:
         """Compute the output from the latent."""
         if isinstance(latents, list):
             return [self.latent_to_output(latent) for latent in latents]  # type: ignore
         else:
-            return torch.tensor(self.head(latents))
+            return self.head(latents)  # type: ignore
 
     def train_step(
         self,
@@ -67,7 +67,9 @@ class FFNet(BaseNet):
         latents = self.latent_forward(latents, inputs)
         outputs = self.latent_to_output(latents)
 
+        torch.use_deterministic_algorithms(False)
         loss = criterion(outputs, solutions).mean()
+        torch.use_deterministic_algorithms(True)
         loss.backward()
 
         if hyperparams.grad_clip is not None:
