@@ -16,6 +16,8 @@ def main() -> None:
     # model_names = [name for name in model_names if ('it_net' in name) and ('best' in name) and ('2025-03-0' in name)]
     # Random initial weights and progressive learning dt-net models (03-11 to 03-13)
     # model_names = [name for name in model_names if ('dt_net' in name) and ('best' in name) and ('2025-03-1' in name)]
+    # Random initial weights without gradient clipping or progressive learning dt-net models (04-17 to 04-18)
+    # model_names = [name for name in model_names if ('dt_net' in name) and ('best' in name) and ('2025-04-1' in name)]
 
     # it-net
     # Random iters, JFB, without contraction it-net models (03-25 to 03-26)
