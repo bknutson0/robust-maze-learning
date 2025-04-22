@@ -27,10 +27,17 @@ def main() -> None:
     #     if ('it_net' in name) and ('best' in name) and ('2025-03-25' in name or '2025-03-26' in name)
     # ]
     # Random iters, JFB, with contraction it-net models (03-27 to 03-28)
+    # model_names = [
+    #     name
+    #     for name in model_names
+    #     if ('it_net' in name) and ('best' in name) and ('2025-03-27' in name or '2025-03-28' in name)
+    # ]
+
+    # ff-net
     model_names = [
         name
         for name in model_names
-        if ('it_net' in name) and ('best' in name) and ('2025-03-27' in name or '2025-03-28' in name)
+        if ('ff_net' in name) and ('best' in name) and ('2025-04-20' in name or '2025-04-21' in name)
     ]
 
     # Define test parameters

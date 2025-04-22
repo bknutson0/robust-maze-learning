@@ -1,329 +1,338 @@
 import logging
 import os
+from pathlib import Path
 from typing import Any
 
-import matplotlib.cm as cm
 import matplotlib.colors as mcolors
 import matplotlib.pyplot as plt
+import numpy as np
 import pandas as pd
 import torch
 
 from src.utils.config import LOGGING_LEVEL, PlotConfig
 
+# Apply global style
 config = PlotConfig()
-config.apply()  # Explicitly apply global font and style settings
+config.apply()
 
-# Create logger
+# Logger setup
 logging.basicConfig(
-    level=getattr(logging, LOGGING_LEVEL, logging.INFO),  # Default to INFO if LOGGING_LEVEL is invalid
+    level=getattr(logging, LOGGING_LEVEL, logging.INFO),
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
 )
 logger = logging.getLogger(__name__)
 
+# Valid model prefixes
+ALLOWED_MODELS = ('dt_net', 'it_net', 'ff_net')
+
 
 def filter_dataframe(df: pd.DataFrame, filters: dict[str, Any] | None = None) -> pd.DataFrame:
-    """Filter a DataFrame based on permissible values provided in a dictionary."""
-    if filters is None:
+    """Filter DataFrame by specified column values."""
+    if not filters:
         return df
-    else:
-        mask = pd.Series(True, index=df.index)
-        for col, allowed_values in filters.items():
-            if not isinstance(allowed_values, list):
-                allowed_values = [allowed_values]
-            if col not in df.columns:
-                raise ValueError(f"Column '{col}' not found in DataFrame.")
-            mask &= df[col].isin(allowed_values)
-        return df[mask]
+    mask = pd.Series(True, index=df.index)
+    for col, vals in filters.items():
+        vals_list = vals if isinstance(vals, list) else [vals]
+        if col not in df.columns:
+            raise KeyError(f"Column '{col}' not found in DataFrame.")
+        mask &= df[col].isin(vals_list)
+    return df[mask]
 
 
-def plot_test_accuracies(test_names: str | list[str], plot_type: str, filters: dict[str, Any] | None = None) -> None:
-    """Plot the results of one or more tests and save the plot(s) to file."""
-    # Allow test_names to be either a single test or a list of tests.
-    if isinstance(test_names, str):
-        test_names = [test_names]
+def load_results(test_name: str, filters: dict[str, Any] | None = None) -> pd.DataFrame:
+    """Load and optionally filter test results for a given test."""
+    path = Path('outputs') / 'tests' / test_name / 'results.csv'
+    df = pd.read_csv(path)
+    return filter_dataframe(df, filters)
 
-    if plot_type == 'overall_acc_vs_perc':
-        # ... (existing overall_acc_vs_perc code remains unchanged) ...
-        test_data = []
-        test_iters = []
-        for test_name in test_names:
-            df_temp = pd.read_csv(f'outputs/tests/{test_name}/results.csv')
-            df_temp = filter_dataframe(df_temp, filters)
-            unique_iter = df_temp['test_iter'].unique()
-            if len(unique_iter) != 1:
-                raise ValueError(f'Expected single test_iter for {test_name}, got {unique_iter}')
-            test_iter = unique_iter[0]
-            test_iters.append(test_iter)
 
-            model_names = df_temp['model_name'].unique()
-            if all('dt_net' in model_name for model_name in model_names):
-                model_label = 'RNN'
-            elif all('it_net' in model_name for model_name in model_names):
-                model_label = 'INN'
-            else:
-                raise ValueError('Model names contain both dt_net and it_net. Unable to determine model type.')
+def infer_model_type(df: pd.DataFrame) -> str:
+    """Ensure exactly one model prefix and return it."""
+    prefixes = {m for name in df['model_name'].unique() for m in ALLOWED_MODELS if m in name}
+    if len(prefixes) != 1:
+        raise ValueError(f'Expected one model type, found: {prefixes}')
+    return prefixes.pop()
 
-            acc = df_temp.groupby('train_percolation')['correct'].mean().reset_index()
-            acc.sort_values('train_percolation', inplace=True)
-            test_data.append((test_iter, model_label, acc))
 
-        norm = mcolors.LogNorm(vmin=min(test_iters), vmax=max(test_iters))
-        cmap = plt.get_cmap('viridis')
+def plot_overall_acc_vs_perc(test_names: list[str], filters: dict[str, Any] | None, combined_dir: Path) -> None:
+    """Plot and save overall accuracy vs train percolation for each test and combined."""
+    data: list[tuple[float, str, pd.DataFrame]] = []
+    cmap = plt.get_cmap('viridis')  # select colormap once
+    for name in test_names:
+        df = load_results(name, filters)
+        iters = df['test_iter'].unique()
+        if len(iters) != 1:
+            raise ValueError(f"Multiple test_iter for '{name}': {iters}")
+        model_type = infer_model_type(df)
+        acc_df = df.groupby('train_percolation')['correct'].mean().reset_index()
+        data.append((iters[0], model_type, acc_df))
 
-        plt.figure(figsize=(14, 6), dpi=600)
-        for i, (test_iter, model_label, acc) in enumerate(test_data):
-            marker = 's' if i == 1 else 'o'
-            linestyle = '--' if i == 1 else '-'
-            plt.plot(
-                acc['train_percolation'],
-                acc['correct'],
-                marker=marker,
-                linestyle=linestyle,
-                linewidth=2,
-                markersize=6,
-                label=f'{model_label}',
-                color=cmap(norm(test_iter)),
+        fig, ax = plt.subplots(figsize=(8, 4))
+        norm = mcolors.LogNorm(vmin=min(i for i, *_ in data), vmax=max(i for i, *_ in data))
+        ax.plot(acc_df['train_percolation'], acc_df['correct'], label=model_type, color=cmap(norm(iters[0])))
+        ax.set(xlim=(0, 0.01), ylim=(0, 1), xlabel='Train Percolation', ylabel='Accuracy', title=name)
+        ax.legend()
+        out = Path('outputs') / 'tests' / name / 'overall_acc_vs_perc.pdf'
+        out.parent.mkdir(parents=True, exist_ok=True)
+        fig.savefig(out, bbox_inches='tight')
+        plt.close(fig)
+
+    if len(test_names) > 1:
+        fig, axes = plt.subplots(len(data), 1, figsize=(8, 4 * len(data)), sharex=True, sharey=True)
+        norm = mcolors.LogNorm(vmin=min(i for i, *_ in data), vmax=max(i for i, *_ in data))
+        for idx, ((iter_val, model_type, acc_df), name) in enumerate(zip(data, test_names, strict=False)):
+            ax = axes[idx]
+            ax.plot(acc_df['train_percolation'], acc_df['correct'], label=model_type, color=cmap(norm(iter_val)))
+            ax.set(title=name)
+            if idx == 0:
+                ax.set(ylabel='Accuracy')
+            ax.label_outer()
+            ax.legend(loc='upper left')
+        axes[-1].set(xlabel='Train Percolation')
+        combined_dir.mkdir(parents=True, exist_ok=True)
+        fig.savefig(combined_dir / 'combined_overall_acc_vs_perc.pdf', bbox_inches='tight')
+        plt.close(fig)
+
+
+def plot_acc_vs_perc(test_names: list[str], filters: dict[str, Any] | None, combined_dir: Path) -> None:
+    """Plot accuracy vs test percolation, per test and combined."""
+    cmap = plt.get_cmap('plasma')
+
+    # 1) Individual plots (updated size & line width)
+    for name in test_names:
+        df = load_results(name, filters)
+        # Ensure single test_maze_size
+        if df['test_maze_size'].nunique() != 1:
+            raise ValueError(f"Expected single test_maze_size for '{name}', found: {df['test_maze_size'].unique()}")
+        # Ensure single test_iter
+        if df['test_iter'].nunique() != 1:
+            raise ValueError(f"Expected single test_iter for '{name}', found: {df['test_iter'].unique()}")
+        model_type = infer_model_type(df)
+        models = sorted(
+            df['model_name'].unique(), key=lambda mn: df.loc[df['model_name'] == mn, 'train_percolation'].iat[0]
+        )
+        tps = [float(df[df['model_name'] == m]['train_percolation'].iat[0]) for m in models]
+        vals = [tp if tp > 0 else 1e-3 for tp in tps]
+        norm = mcolors.Normalize(vmin=min(vals), vmax=max(vals))
+
+        # bigger figure:
+        fig, ax = plt.subplots(figsize=(12, 6))
+        for m, tp in zip(models, tps, strict=False):
+            dfm = df[df['model_name'] == m]
+            sub = dfm.groupby('test_percolation')['correct'].mean().reset_index()
+            color = cmap(norm(tp if tp > 0 else 1e-3))
+            # thicker lines:
+            ax.plot(sub['test_percolation'], sub['correct'], marker='o', linewidth=2, label=f'{tp:.3f}', color=color)
+            ax.axvline(tp, linestyle='--', color=color, linewidth=2)
+
+        ax.set(xlim=(0, 1), ylim=(0, 1), xlabel='Test Percolation', ylabel='Test Accuracy', title=model_type)
+
+        fig.subplots_adjust(right=0.75)
+        ax.legend(title='Train Perc.', loc='center left', bbox_to_anchor=(1.02, 0.5))
+
+        out = Path('outputs') / 'tests' / name / 'acc_vs_perc.pdf'
+        out.parent.mkdir(parents=True, exist_ok=True)
+        fig.savefig(out, bbox_inches='tight')
+        plt.close(fig)
+
+    # 2) Combined row of subplots
+    if len(test_names) > 1:
+        combined_dir.mkdir(parents=True, exist_ok=True)
+        fig_comb, axes = plt.subplots(
+            1,
+            len(test_names),
+            figsize=(10 * len(test_names), 6),
+            sharey=True,
+        )
+        axes = np.atleast_1d(axes)
+
+        for idx, name in enumerate(test_names):
+            ax = axes[idx]
+            df = load_results(name, filters)
+            model_type = infer_model_type(df)
+            models = sorted(
+                df['model_name'].unique(), key=lambda mn: df.loc[df['model_name'] == mn, 'train_percolation'].iat[0]
             )
+            tps = [float(df[df['model_name'] == m]['train_percolation'].iat[0]) for m in models]
+            norm = mcolors.Normalize(vmin=min(tps), vmax=max(tps))
 
-        plt.xlabel('Train Percolation')
-        plt.xlim(0, 0.01)
-        plt.ylabel('Overall Test Accuracy')
-        plt.ylim(0, 1)
-        plt.legend(loc='upper left', bbox_to_anchor=(1.05, 1))
-        for test_name in test_names:
-            plt.savefig(f'outputs/tests/{test_name}/overall_acc_vs_perc.pdf', bbox_inches='tight')
-        plt.close()
-
-    else:
-        # For other plot types, loop over each test and produce separate plots (or a summary for heatmaps)
-        if plot_type == 'acc_vs_perc':
-            for test_name in test_names:
-                df = pd.read_csv(f'outputs/tests/{test_name}/results.csv')
-                df = filter_dataframe(df, filters)
-                model_names = df['model_name'].unique().tolist()
-
-                if plot_type == 'acc_vs_perc':
-                    train_percolations = []
-                    for model_name in model_names:
-                        train_percolation = df[df['model_name'] == model_name]['train_percolation'].unique()
-                        if len(train_percolation) == 1:
-                            train_percolations.append(train_percolation[0])
-                        else:
-                            raise ValueError(
-                                f'Expected single train_percolation value for {model_name = }, '
-                                f'got {train_percolation = }'
-                            )
-
-                    model_names, train_percolations = map(
-                        list,
-                        zip(
-                            *sorted(zip(model_names, train_percolations, strict=False), key=lambda x: x[1]),
-                            strict=False,
-                        ),
-                    )
-
-                    maze_sizes = df['test_maze_size'].unique()
-                    if len(maze_sizes) > 1:
-                        raise NotImplementedError(f'Expected single maze size for each model, got {maze_sizes = }')
-
-                    plt.figure(figsize=(14, 6), dpi=600)
-                    small_value = 1e-3
-                    color_mapping_values = [tp if tp > 0 else small_value for tp in train_percolations]
-                    cmap_local = cm.get_cmap('plasma', len(train_percolations))
-                    norm_local = mcolors.Normalize(vmin=min(color_mapping_values), vmax=max(color_mapping_values))
-                    colors = [cmap_local(norm_local(tp if tp > 0 else small_value)) for tp in train_percolations]
-
-                    for model_name, train_percolation, color in zip(
-                        model_names, train_percolations, colors, strict=False
-                    ):
-                        df_subset = df[df['model_name'] == model_name]
-                        df_subset = df_subset.groupby('test_percolation')['correct'].mean().reset_index()
-                        df_subset = df_subset.sort_values(by='test_percolation')
-                        plt.plot(
-                            df_subset['test_percolation'],
-                            df_subset['correct'],
-                            marker='o',
-                            linestyle='-',
-                            linewidth=5,
-                            markersize=10,
-                            label=f'{train_percolation:.3f}',
-                            color=color,
-                            zorder=3,
-                        )
-                        plt.axvline(x=train_percolation, color=color, linestyle='dashed', linewidth=5, zorder=1)
-
-                    plt.xlabel('Test Percolation')
-                    plt.ylabel('Test Accuracy')
-                    plt.xlim(0, 1)
-                    plt.ylim(0, 1)
-                    plt.title('Test Accuracy vs Test Percolation', fontsize=config.font_size * 1.2)
-                    legend = plt.legend(title='Train Percolation', loc='upper left', bbox_to_anchor=(1.05, 1))
-                    plt.setp(
-                        legend.get_title(), fontweight=config.legend_title_weight, fontsize=config.legend_title_fontsize
-                    )
-                    plt.savefig(f'outputs/tests/{test_name}/acc_vs_perc.pdf', bbox_inches='tight')
-                    plt.close()
-
-        elif plot_type == 'acc_vs_size_perc':
-            summary_list = []
-            for test_name in test_names:
-                df = pd.read_csv(f'outputs/tests/{test_name}/results.csv')
-                df = filter_dataframe(df, filters)
-
-                # Ensure required axes have multiple unique values.
-                for col in ['test_maze_size', 'test_percolation']:
-                    if df[col].nunique() <= 1:
-                        raise ValueError(f"Column '{col}' must have multiple unique values for a heatmap.")
-
-                # Only require a unique test_iter via filters.
-                allowed_filters = {'test_iter'}
-                filters = filters or {}
-                multi_value_cols = {col for col in allowed_filters if df[col].nunique() > 1}
-                if multi_value_cols - filters.keys():
-                    raise ValueError(
-                        f'Columns {multi_value_cols - filters.keys()} have multiple values. '
-                        f'Please specify one in `filters`.'
-                    )
-
-                filtered_df = filter_dataframe(df, filters)
-                # Iterate over each unique model.
-                for model in filtered_df['model_name'].unique():
-                    df_model = filtered_df[filtered_df['model_name'] == model]
-                    # Create a short label for the model.
-                    if 'dt_net' in model:
-                        label = 'dt_net'
-                    elif 'it_net' in model:
-                        label = 'it_net'
-                    else:
-                        label = model
-
-                    train_perc_vals = df_model['train_percolation'].unique()
-                    if len(train_perc_vals) != 1:
-                        raise ValueError(f'Expected single train_percolation for {model}, got {train_perc_vals}.')
-                    train_perc = train_perc_vals[0]
-
-                    test_iter_vals = df_model['test_iter'].unique()
-                    if len(test_iter_vals) != 1:
-                        raise ValueError(f'Expected single test_iter for {model}, got {test_iter_vals}.')
-                    test_iter = test_iter_vals[0]
-
-                    heatmap_data = df_model.groupby(['test_percolation', 'test_maze_size'])['correct'].mean().unstack()
-                    x_labels = heatmap_data.columns.values
-                    y_labels = heatmap_data.index.values
-                    heatmap_values = heatmap_data.values
-
-                    dx = (x_labels[-1] - x_labels[0]) / (len(x_labels) - 1) if len(x_labels) > 1 else 1
-                    x_extent = [x_labels[0] - dx / 2, x_labels[-1] + dx / 2]
-                    extent = [x_extent[0], x_extent[1], y_labels[0], y_labels[-1]]
-
-                    train_maze_size_vals = df_model['train_maze_size'].unique()
-                    if len(train_maze_size_vals) != 1:
-                        raise ValueError(f'Expected single train_maze_size for {model}, got {train_maze_size_vals}.')
-                    train_maze_size = train_maze_size_vals[0]
-
-                    summary_list.append(
-                        {
-                            'test_name': test_name,
-                            'train_percolation': train_perc,
-                            'test_iter': test_iter,
-                            'model_label': label,
-                            'heatmap_values': heatmap_values,
-                            'x_labels': x_labels,
-                            'y_labels': y_labels,
-                            'extent': extent,
-                            'train_maze_size': train_maze_size,
-                        }
-                    )
-
-            # Ensure that all summary plots use the same model type and iteration.
-            model_types = list({data['model_label'] for data in summary_list})
-            if len(model_types) != 1:
-                raise ValueError(f'Expected exactly one model type across all plots, found: {model_types}')
-            test_iters = list({data['test_iter'] for data in summary_list})
-            if len(test_iters) != 1:
-                raise ValueError(f'Expected exactly one test_iter across all plots, found: {test_iters}')
-
-            common_model_type = model_types[0]
-            common_test_iter = test_iters[0]
-
-            # Order the summary list by training percolation (left-to-right).
-            summary_list.sort(key=lambda d: d['train_percolation'])
-            n_plots = len(summary_list)
-            fig, axes = plt.subplots(1, n_plots, figsize=(8 * n_plots, 6))
-            if n_plots == 1:
-                axes = [axes]
-
-            last_im = None
-            for i, (ax, data) in enumerate(zip(axes, summary_list, strict=False)):
-                im = ax.imshow(
-                    data['heatmap_values'], cmap='coolwarm', aspect='auto', origin='lower', extent=tuple(data['extent'])
+            for m, tp in zip(models, tps, strict=False):
+                dfm = df[df['model_name'] == m]
+                sub = dfm.groupby('test_percolation')['correct'].mean().reset_index()
+                color = cmap(norm(tp))
+                ax.plot(
+                    sub['test_percolation'],
+                    sub['correct'],
+                    marker='o',
+                    linewidth=5,  # thicker main line
+                    label=f'{tp:.3f}',
+                    color=color,
                 )
-                last_im = im  # Save the last mappable for the colorbar.
-                xticks = data['x_labels']
-                ax.set_xticks(xticks)
-                ax.set_xticklabels(xticks.astype(str))  # turn them into strings
-
-                # now turn off visibility of the odd ones:
-                for lbl in ax.xaxis.get_ticklabels()[1::2]:
-                    lbl.set_visible(False)
-                ax.set_yticks(data['y_labels'])
-                # Only the leftmost plot retains y tick labels.
-                if i == 0:
-                    ax.set_yticklabels(data['y_labels'])
-                    model_type = 'IT-Net' if common_model_type == 'it_net' else 'DT-Net'
-                    ax.set_ylabel(f'{model_type} \n Test Percolation')
-                else:
-                    ax.tick_params(labelleft=False)
-                    ax.set_ylabel('')
-                ax.set_xlabel('Test Maze Size')
-                # Title now only shows the training percolation.
-                ax.set_title(f'Train Perc: {data["train_percolation"]:.3f}')
-                ax.scatter(
-                    data['train_maze_size'],
-                    data['train_percolation'],
-                    marker='*',
-                    s=400,
-                    color='gold',
-                    edgecolors='gold',
-                    linewidths=1.5,
-                    zorder=4,
+                ax.axvline(
+                    tp,
+                    linestyle='--',
+                    color=color,
+                    linewidth=5,
                     clip_on=False,
+                    zorder=3,
                 )
 
-            # Adjust subplots so that there's less whitespace between them and to the right.
-            fig.subplots_adjust(wspace=0.03, right=0.82)
+            ax.set(
+                xlim=(0.0, 1.0),
+                ylim=(0.0, 1.0),
+                title=model_type,
+            )
+            if idx == 0:
+                ax.set_ylabel('Test Acc.')
+            ax.set_xlabel('Test Perc.')
+            ax.label_outer()
 
-            # # Add the color bar: placed just right of the subplots.
-            # # Adjusted position: left edge at 0.83, with the desired vertical and height settings.
-            # cbar_ax = fig.add_axes((0.83, 0.1, 0.01, 0.6))
-            # if last_im is None:
-            #     raise ValueError("No heatmap was created, so 'last_im' is None.")
-            # fig.colorbar(last_im, cax=cbar_ax, label='Test Accuracy')
+        # shared legend on the right, tighter spacing
+        lines, labels = axes[0].get_legend_handles_labels()
+        fig_comb.subplots_adjust(right=0.75, wspace=0.2)
+        fig_comb.legend(lines, labels, title='Train Perc.', loc='center left', bbox_to_anchor=(0.8, 0.5))
 
-            # # Create a legend using invisible patches for model type and iterations.
-            # # Add a line for the training distribution.
+        out_comb = combined_dir / 'combined_acc_vs_perc.pdf'
+        fig_comb.savefig(out_comb, bbox_inches='tight')
+        plt.close(fig_comb)
 
-            # l_distribution = mlines.Line2D(
-            #     [], [], marker='*', color='gold', linestyle='None', markersize=10, label='Training distribution'
-            # )
-            # l_model = mpatches.Patch(color='none', label=f'Model type: {common_model_type}')
-            # l_iter = mpatches.Patch(color='none', label=f'Iterations: {common_test_iter}')
 
-            # # Place the legend directly above the color bar.
-            # fig.legend(
-            #     handles=[l_distribution, l_model, l_iter],
-            #     loc='lower center',
-            #     bbox_to_anchor=(0.848, 0.70),
-            # )
+def plot_acc_vs_size_perc(test_names: list[str], filters: dict[str, Any] | None, combined_dir: Path) -> None:
+    """Plot heatmaps of accuracy vs size & percolation, per test and combined."""
+    cmap = plt.get_cmap('coolwarm')
+    all_summaries: list[tuple[str, str, list[tuple[float, float, pd.DataFrame]]]] = []
 
-            # Save the figure without using tight_layout (to avoid layout warnings).
-            summary_filename = f'outputs/tests/{test_name}/acc_vs_size_perc.pdf'
-            plt.savefig(summary_filename, bbox_inches='tight')
-            logger.info(f'Saved summary heatmap to {summary_filename}')
-            plt.close()
+    # 1) per-test: load, summarize, draw individual row (unchanged)…
+    for name in test_names:
+        df = load_results(name, filters)
+        if df['test_maze_size'].nunique() <= 1 or df['test_percolation'].nunique() <= 1:
+            raise ValueError('Need multiple sizes and percolation values.')
 
-        else:
-            raise ValueError(f'Invalid plot_type: {plot_type}.')
+        model_type = infer_model_type(df)
+        summary: list[tuple[float, float, pd.DataFrame]] = []
+        for m in sorted(
+            df['model_name'].unique(), key=lambda m: df.loc[df['model_name'] == m, 'train_percolation'].iat[0]
+        ):
+            dfm = df[df['model_name'] == m]
+            tp = float(dfm['train_percolation'].iat[0])
+            ts = float(dfm['train_maze_size'].iat[0])
+            heat = dfm.groupby(['test_percolation', 'test_maze_size'])['correct'].mean().unstack()
+            summary.append((tp, ts, heat))
+
+        all_summaries.append((name, model_type, summary))
+        fig_ind, axes_ind = plt.subplots(1, len(summary), figsize=(5 * len(summary), 4), sharey=True)
+        first_star = None
+        for j, (tp, ts, heat) in enumerate(summary):
+            ax = axes_ind[j]
+            cols = heat.columns
+            dx = (cols[1] - cols[0]) if len(cols) > 1 else 1
+            extent = [cols[0] - dx / 2, cols[-1] + dx / 2, heat.index[0], heat.index[-1]]
+            im = ax.imshow(heat.values, origin='lower', aspect='auto', extent=extent, cmap=cmap, vmin=0, vmax=1)
+            ax.set_xlabel('Maze Size')
+            if j == 0:
+                ax.set_ylabel(f'{model_type}\nTest Perc.')
+            ax.set_title(f'Train Perc.\n= {tp:.3f}')
+            star = ax.scatter(ts, tp, marker='*', s=300, edgecolors='gold', facecolors='gold', zorder=4, clip_on=False)
+            if first_star is None:
+                first_star = star
+            ax.label_outer()
+            ax.margins(0.02)
+
+        fig_ind.subplots_adjust(wspace=0.05, right=0.85, top=0.9, bottom=0.15)
+        cbar = fig_ind.colorbar(im, ax=axes_ind.tolist(), fraction=0.02, pad=0.02)
+        cbar.set_label('Test Accuracy')
+        # one‐entry legend
+        if first_star is not None:
+            fig_ind.legend(
+                [first_star],
+                ['Training distribution'],
+                loc='lower center',
+                bbox_to_anchor=(0.5, -0.4),
+                ncol=1,
+            )
+        out_dir = Path('outputs') / 'tests' / name
+        out_dir.mkdir(parents=True, exist_ok=True)
+        fig_ind.savefig(out_dir / 'acc_vs_size_perc.pdf', bbox_inches='tight')
+        plt.close(fig_ind)
+
+    # 2) Combined grid across tests × models
+    n_tests = len(all_summaries)
+    n_models = len(all_summaries[0][2])
+    fig, axes = plt.subplots(n_tests, n_models, sharex=True, sharey=True, figsize=(6 * n_models, 4 * n_tests))
+    axes = np.atleast_2d(axes)
+    first_handle = None
+
+    for i, (_name, model_type, summary) in enumerate(all_summaries):
+        for j, (tp, ts, heat) in enumerate(summary):
+            ax = axes[i, j]
+            cols = heat.columns
+            dx = (cols[1] - cols[0]) if len(cols) > 1 else 1
+            extent = [cols[0] - dx / 2, cols[-1] + dx / 2, heat.index[0], heat.index[-1]]
+            im = ax.imshow(heat.values, origin='lower', aspect='auto', extent=extent, cmap=cmap, vmin=0, vmax=1)
+
+            if j == 0:
+                ax.set_ylabel(f'{model_type}\nTest Perc.')
+            if i == n_tests - 1:
+                ax.set_xlabel('Maze Size')
+            if i == 0:
+                ax.set_title(f'Train Perc.\n={tp:.3f}')
+
+            handle = ax.scatter(
+                ts,
+                tp,
+                marker='*',
+                s=400,
+                edgecolors='gold',
+                facecolors='gold',
+                zorder=4,
+                clip_on=False,  # ← allow star outside plot
+                label=('Training distribution' if first_handle is None else '_nolegend_'),
+            )
+            if first_handle is None:
+                first_handle = handle
+
+            ax.label_outer()
+            ax.margins(x=0.02, y=0.02)  # small padding so marker isn't clipped
+
+    # after drawing all heatmaps and adding the colorbar…
+    cbar = fig.colorbar(im, ax=axes.ravel().tolist(), fraction=0.02, pad=0.02)
+    cbar.set_label('Test Accuracy')
+
+    # make room at bottom for a horizontal legend
+    fig.subplots_adjust(
+        hspace=0.1,
+        wspace=0.05,
+        left=0.1,
+        right=0.85,
+        top=0.92,
+        bottom=0.18,  # increased from 0.15 → 0.25
+    )
+
+    # one star‐entry legend, centered well below
+    fig.legend(
+        handles=[first_handle],
+        labels=['Training distribution'],
+        loc='lower center',
+        bbox_to_anchor=(0.5, -0.02),  # y shifted down
+        ncol=1,
+    )
+
+    combined_dir.mkdir(parents=True, exist_ok=True)
+    fig.savefig(combined_dir / 'combined_acc_vs_size_perc.pdf', bbox_inches='tight')
+    plt.close(fig)
+
+
+def plot_test_accuracies(test_names: list[str], plot_type: str, filters: dict[str, Any] | None = None) -> None:
+    """Entry point: routes to specific plot functions and manages combined output."""
+    combined_dir = Path('outputs') / 'visuals' / 'plots'
+    handlers = {
+        'overall_acc_vs_perc': plot_overall_acc_vs_perc,
+        'acc_vs_perc': plot_acc_vs_perc,
+        'acc_vs_size_perc': plot_acc_vs_size_perc,
+    }
+    if plot_type not in handlers:
+        raise ValueError(f'Unknown plot type: {plot_type}')
+    handlers[plot_type](test_names, filters, combined_dir)
 
 
 def plot_mazes(
@@ -336,12 +345,10 @@ def plot_mazes(
     if all(x is None for x in [inputs, solutions, predictions]):
         raise ValueError('At least one of inputs, solutions, or predictions must be provided.')
 
-    # Ensure valid batch size
     for tensor, name in zip([inputs, solutions, predictions], ['Inputs', 'Solutions', 'Predictions'], strict=False):
         if tensor is not None and tensor.size(0) == 0:
             raise ValueError(f'{name} tensor has zero batch size.')
 
-    # Ensure tensors have batch dimension
     if inputs is not None and inputs.dim() == 3:
         inputs = inputs.unsqueeze(0)
     if solutions is not None and solutions.dim() == 2:
@@ -351,7 +358,6 @@ def plot_mazes(
 
     batch_size = max(x.size(0) if x is not None else 0 for x in [inputs, solutions, predictions])
 
-    # Filter out None values
     mazes = [
         (maze, title)
         for maze, title in zip([inputs, solutions, predictions], ['Inputs', 'Solutions', 'Predictions'], strict=False)
@@ -359,21 +365,18 @@ def plot_mazes(
     ]
     num_cols = len(mazes)
 
-    # Create figure with proper spacing
     fig, axes = plt.subplots(batch_size, num_cols, figsize=(3.5 * num_cols, 3.5 * batch_size), dpi=300, squeeze=False)
 
     for row in range(batch_size):
         for col, (maze, title) in enumerate(mazes):
-            ax = axes[row, col] if batch_size > 1 else axes[col]  # Ensure correct indexing
+            ax = axes[row, col] if batch_size > 1 else axes[col]
             ax.imshow(
                 maze[row].permute(1, 2, 0).cpu().numpy() if title == 'Inputs' else maze[row].cpu().numpy(), cmap='gray'
             )
-            ax.set_title(title, fontsize=config.subplot_title_size, pad=10)  # Ensure titles appear
+            ax.set_title(title, fontsize=config.subplot_title_size, pad=10)
             ax.axis('off')
 
-    plt.subplots_adjust(wspace=0.1, hspace=0.2)  # Increase space between subplots
-
-    # Save the plot
+    plt.subplots_adjust(wspace=0.1, hspace=0.2)
     os.makedirs(os.path.dirname(file_name), exist_ok=True)
     plt.savefig(f'{file_name}.pdf', bbox_inches='tight')
     plt.close()
@@ -381,13 +384,10 @@ def plot_mazes(
 
 def plot_predictions(test_name: str, correct: bool | None = None) -> None:
     """Plot model predictions, possibly filtering by correctness, and save the plot to a file."""
-    # Load the test dataframe
     df = pd.read_csv(f'outputs/tests/{test_name}/results.csv')
 
-    # Get model names
-    # model_names = df['model_name'].unique().tolist()
-
-    # Ensure only one maze size for each model
     maze_sizes = df['test_maze_size'].unique()
     if len(maze_sizes) > 1:
         raise NotImplementedError(f'Expected single maze size for each model, got {maze_sizes = }')
+
+    # implement prediction plotting logic here

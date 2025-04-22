@@ -22,6 +22,9 @@ def main() -> None:
     # it_net_test_name = '2025-03-30_11:45:35' # Contractive it_net and num_mazes = 100
     it_net_test_name = '2025-04-16_17:27:53'  # larger range of maze sizes
 
+    # ff_net
+    ff_net_test_name = '2025-04-21_12:48:32'
+
     # df = pd.read_csv(f'outputs/tests/{it_net_test_name}/results.csv')
     # print(df.head(20))
     # # Print unique values in each column
@@ -35,7 +38,7 @@ def main() -> None:
     #     train_percolation = df[df['model_name'] == model_name]['train_percolation'].unique()
     #     print(f'{model_name = }, {train_percolation[0] = }')
 
-    test_names = [dt_net_test_name, it_net_test_name]
+    test_names = [ff_net_test_name, dt_net_test_name, it_net_test_name]
     # # Plot test accuracy versus test percolation for models trained with different percolations
     # plot_test_accuracies(
     #     it_net_test_name,
@@ -60,9 +63,14 @@ def main() -> None:
 
     # Plot overall test accuracy for each model
     plot_test_accuracies(
-        it_net_test_name,
-        'acc_vs_size_perc',
-        filters={'train_percolation': [0.0, 0.001, 0.01, 0.1, 0.5, 0.99], 'test_iter': 200},
+        test_names,
+        'acc_vs_perc',
+        # filters={'train_percolation': [0.0, 0.001, 0.01, 0.1, 0.5, 0.99], 'test_iter': 200},
+        filters={
+            'train_percolation': [0.0, 0.001, 0.1, 0.3, 0.5, 0.7, 0.9, 0.99],
+            'test_iter': 200,
+            'test_maze_size': 9,
+        },
     )
 
     # #Plot mazes

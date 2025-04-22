@@ -40,7 +40,11 @@ class FFNet(BaseNet):
         self, latents: Tensor, inputs: Tensor, iters: int | list[int] = 1, tolerance: float | None = None
     ) -> Tensor:
         """Perform the forward pass through the feedforward blocks."""
-        return self.feedforward_blocks(latents)  # type: ignore
+        latents = self.feedforward_blocks(latents)
+        if isinstance(iters, list):
+            return [latents for _ in iters]  # type: ignore
+        else:
+            return latents
 
     def latent_to_output(self, latents: Tensor | list[Tensor]) -> Tensor | list[Tensor]:
         """Compute the output from the latent."""
