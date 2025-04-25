@@ -61,15 +61,31 @@ def main() -> None:
     #         },
     #     )
 
-    # Plot overall test accuracy for each model
+    # # Create heatmaps
+    # plot_test_accuracies(
+    #     test_names,
+    #     'acc_vs_size_perc',
+    #     filters={'train_percolation': [0.0, 0.001, 0.01, 0.1, 0.5, 0.99], 'test_iter': 200},
+    # )
+
+    # # Plot test accuracy versus train percolation
+    # plot_test_accuracies(
+    #     test_names,
+    #     'acc_vs_perc',
+    #     filters={
+    #         'train_percolation': [0.0, 0.001, 0.1, 0.3, 0.5, 0.7, 0.9, 0.99],
+    #         'test_iter': 200,
+    #         'test_maze_size': 9,
+    #     },
+    # )
+
+    # Plot overall test accuracy versus test percolation
     plot_test_accuracies(
         test_names,
-        'acc_vs_perc',
-        # filters={'train_percolation': [0.0, 0.001, 0.01, 0.1, 0.5, 0.99], 'test_iter': 200},
+        'overall_acc_vs_perc',
         filters={
-            'train_percolation': [0.0, 0.001, 0.1, 0.3, 0.5, 0.7, 0.9, 0.99],
             'test_iter': 200,
-            'test_maze_size': 9,
+            'test_maze_size': [9, 11, 13, 15, 17, 19, 21, 23, 25, 27, 29],
         },
     )
 

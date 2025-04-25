@@ -57,8 +57,9 @@ def infer_model_type(df: pd.DataFrame) -> str:
 def plot_overall_acc_vs_perc(test_names: list[str], filters: dict[str, Any] | None, combined_dir: Path) -> None:
     """Plot and save overall accuracy vs train percolation for each test and combined."""
     data: list[tuple[float, str, pd.DataFrame]] = []
-    cmap = plt.get_cmap('viridis')  # select colormap once
-    for name in test_names:
+    palette = plt.get_cmap('tab10')
+    # 1) Individual plots
+    for idx, name in enumerate(test_names):
         df = load_results(name, filters)
         iters = df['test_iter'].unique()
         if len(iters) != 1:
@@ -67,30 +68,46 @@ def plot_overall_acc_vs_perc(test_names: list[str], filters: dict[str, Any] | No
         acc_df = df.groupby('train_percolation')['correct'].mean().reset_index()
         data.append((iters[0], model_type, acc_df))
 
-        fig, ax = plt.subplots(figsize=(8, 4))
-        norm = mcolors.LogNorm(vmin=min(i for i, *_ in data), vmax=max(i for i, *_ in data))
-        ax.plot(acc_df['train_percolation'], acc_df['correct'], label=model_type, color=cmap(norm(iters[0])))
-        ax.set(xlim=(0, 0.01), ylim=(0, 1), xlabel='Train Percolation', ylabel='Accuracy', title=name)
-        ax.legend()
+        fig, ax = plt.subplots(figsize=(12, 6))
+        color = palette(idx)
+        ax.plot(
+            acc_df['train_percolation'],
+            acc_df['correct'],
+            label=model_type,
+            color=color,
+            linewidth=3,
+            marker='o',
+            markersize=6,
+        )
+        ax.set(xlim=(0, 1), ylim=(0, 1), xlabel='Train Percolation', ylabel='Accuracy', title=model_type)
+        ax.legend(loc='center left', bbox_to_anchor=(1, 0.5), title='Model Type')
         out = Path('outputs') / 'tests' / name / 'overall_acc_vs_perc.pdf'
         out.parent.mkdir(parents=True, exist_ok=True)
         fig.savefig(out, bbox_inches='tight')
         plt.close(fig)
 
-    if len(test_names) > 1:
-        fig, axes = plt.subplots(len(data), 1, figsize=(8, 4 * len(data)), sharex=True, sharey=True)
-        norm = mcolors.LogNorm(vmin=min(i for i, *_ in data), vmax=max(i for i, *_ in data))
-        for idx, ((iter_val, model_type, acc_df), name) in enumerate(zip(data, test_names, strict=False)):
-            ax = axes[idx]
-            ax.plot(acc_df['train_percolation'], acc_df['correct'], label=model_type, color=cmap(norm(iter_val)))
-            ax.set(title=name)
-            if idx == 0:
-                ax.set(ylabel='Accuracy')
-            ax.label_outer()
-            ax.legend(loc='upper left')
-        axes[-1].set(xlabel='Train Percolation')
+    # 2) Combined single plot
+    if len(data) > 1:
         combined_dir.mkdir(parents=True, exist_ok=True)
-        fig.savefig(combined_dir / 'combined_overall_acc_vs_perc.pdf', bbox_inches='tight')
+        fig, ax = plt.subplots(figsize=(12, 6))
+
+        for idx, (_, model_type, acc_df) in enumerate(data):
+            color = palette(idx)
+            ax.plot(
+                acc_df['train_percolation'],
+                acc_df['correct'],
+                label=model_type,
+                color=color,
+                linewidth=6,
+                marker='o',
+                markersize=12,
+                clip_on=False,
+            )
+
+        ax.set(xlim=(-0.01, 1), ylim=(0, 1), xlabel='Train Percolation', ylabel='Overall Test Accuracy')
+        ax.legend(loc='center left', bbox_to_anchor=(1, 0.5), title='Model Type')
+        out_comb = combined_dir / 'combined_overall_acc_vs_perc.pdf'
+        fig.savefig(out_comb, bbox_inches='tight')
         plt.close(fig)
 
 
