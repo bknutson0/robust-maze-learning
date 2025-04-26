@@ -6,10 +6,10 @@ import os
 import torch
 from torch import nn
 
-from src.models.base_net import BaseNet
 from src.models.dt_net import DTNet
 from src.models.ff_net import FFNet
 from src.models.it_net import ITNet
+from src.models.model import DeadendFill, Model
 from src.utils.config import DEVICE, LOGGING_LEVEL, Hyperparameters
 
 # Create logger
@@ -20,9 +20,9 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
-def load_model(model_name: str | None = None, pretrained: str | None = None, weight_init: str | None = None) -> BaseNet:
+def load_model(model_name: str | None = None, pretrained: str | None = None, weight_init: str | None = None) -> Model:
     """Initialize model and load weights from pretrained path or initialize weights."""
-    model: BaseNet
+    model: Model
 
     if pretrained and weight_init:
         raise ValueError('Cannot specify both pretrained and weight_init.')
@@ -48,6 +48,9 @@ def load_model(model_name: str | None = None, pretrained: str | None = None, wei
         model = ITNet()
     elif 'ff_net' in model_name:
         model = FFNet()
+    elif 'deadend_fill' in model_name:
+        model = DeadendFill()
+        return model
     else:
         raise ValueError(f'Unknown model name: {model_name}')
 

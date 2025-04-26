@@ -3,11 +3,11 @@ from abc import abstractmethod
 import torch
 from torch.utils.tensorboard.writer import SummaryWriter
 
-from src.models.predictor import Predictor
+from src.models.model import Model
 from src.utils.config import Hyperparameters
 
 
-class BaseNet(torch.nn.Module, Predictor):
+class BaseNet(torch.nn.Module, Model):
     """Base class for maze networks, containing necessary methods common to all models."""
 
     def __init__(self) -> None:

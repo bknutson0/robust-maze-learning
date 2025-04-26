@@ -6,7 +6,7 @@ from maze_dataset import TargetedLatticeMaze
 from maze_dataset.maze.lattice_maze import _remove_isolated_cells
 
 
-class Predictor(ABC):
+class Model(ABC):
     """Base class for predictors, containing necessary methods common to all models."""
 
     def __init__(self) -> None:
@@ -19,7 +19,7 @@ class Predictor(ABC):
         pass
 
 
-class DeadendFill(Predictor):
+class DeadendFill(Model):
     """Predictor that solves mazes using the deadend-filling algorithm."""
 
     def __init__(self) -> None:
