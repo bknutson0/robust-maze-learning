@@ -60,14 +60,14 @@ def _load_mazes(
         'endpoints_not_equal': True,
         'except_on_no_valid_endpoint': False,
     }
-    cfg_original = MazeDatasetConfig(  # type: ignore
+    cfg_original = MazeDatasetConfig(
         name=f'test-{params.seed}',
         grid_n=grid_n,
-        n_mazes=num_mazes_attempt,
+        n_mazes=num_mazes_attempt,  # type: ignore
         seed=params.seed,
         maze_ctor=maze_ctor,
         maze_ctor_kwargs=maze_ctor_kwargs,
-        endpoint_kwargs=endpoint_kwargs,
+        endpoint_kwargs=endpoint_kwargs,  # type: ignore
     )
 
     # Create base maze dataset from configuration

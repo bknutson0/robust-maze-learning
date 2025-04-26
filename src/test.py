@@ -34,11 +34,13 @@ def main() -> None:
     # ]
 
     # ff-net
-    model_names = [
-        name
-        for name in model_names
-        if ('ff_net' in name) and ('best' in name) and ('2025-04-20' in name or '2025-04-21' in name)
-    ]
+    # model_names = [
+    #     name
+    #     for name in model_names
+    #     if ('ff_net' in name) and ('best' in name) and ('2025-04-20' in name or '2025-04-21' in name)
+    # ]
+
+    model_names = ['deadend_fill']
 
     # Define test parameters
     test_params = TestParameters()
