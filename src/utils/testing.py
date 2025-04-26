@@ -156,7 +156,6 @@ def specific_test(specific_test_params: TestParameters) -> DataFrame:
             predictions = model.predict(inputs, specific_test_params.iters)
             predictions = predictions if isinstance(predictions, list) else [predictions]
             for iter_index, iter_value in enumerate(specific_test_params.iters):  # type: ignore
-                # Tests cannot currently handle extra iters dimension TODO: Handle extra iters dimension
                 matches_solution = compare_mazes(predictions[iter_index], solutions).cpu().numpy()
                 are_valid = is_valid_path(inputs, predictions[iter_index]).cpu().numpy()
                 are_minimal = is_minimal_path(inputs, predictions[iter_index], solutions).cpu().numpy()
