@@ -40,14 +40,15 @@ def main() -> None:
     #     if ('ff_net' in name) and ('best' in name) and ('2025-04-20' in name or '2025-04-21' in name)
     # ]
 
-    model_names = ['deadend_fill']
+    model_names = ['models/dt_net/original.pth']
 
     # Define test parameters
     test_params = TestParameters()
     test_params.model_name = sorted(model_names)
     test_params.maze_size = [5, 7, 9, 11, 13, 15, 17, 19, 21, 23, 25, 27, 29]
-    test_params.num_mazes = 1000
+    test_params.num_mazes = 10  # TODO: change back to 1000
     test_params.iters = [30, 60, 100, 200]
+    test_params.compare_deadend_fill = True
 
     # Perform test
     print('Testing the following models:')

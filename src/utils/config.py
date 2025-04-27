@@ -117,6 +117,7 @@ class TestParameters:
 
     # Testing parameters
     batch_size: int = 256
+    compare_deadend_fill: bool = False  # Compare with deadend-filling algorithm
 
     # dt_net specific
 

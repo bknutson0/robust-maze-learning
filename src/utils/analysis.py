@@ -23,7 +23,7 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # Valid model prefixes
-ALLOWED_MODELS = ('dt_net', 'it_net', 'ff_net')
+ALLOWED_MODELS = ('dt_net', 'it_net', 'ff_net', 'deadend_fill')
 
 
 def filter_dataframe(df: pd.DataFrame, filters: dict[str, Any] | None = None) -> pd.DataFrame:
@@ -214,12 +214,27 @@ def plot_acc_vs_perc(test_names: list[str], filters: dict[str, Any] | None, comb
         plt.close(fig_comb)
 
 
-def plot_acc_vs_size_perc(test_names: list[str], filters: dict[str, Any] | None, combined_dir: Path) -> None:
-    """Plot heatmaps of accuracy vs size & percolation, per test and combined."""
+def plot_value_vs_size_perc(
+    test_names: list[str],
+    filters: dict[str, Any] | None,
+    combined_dir: Path,
+    value: str = 'correct',
+) -> None:
+    """Plot heatmaps of `value` vs size & percolation, per test and combined."""
+    # infer a nice label
+    if value == 'correct':
+        cbar_label = 'Test Accuracy'
+    elif value.startswith('matches_'):
+        # e.g. "matches_deadend_fill" → "Agreement with Deadend Fill"
+        field = value[len('matches_') :].replace('_', ' ').title()
+        cbar_label = f'Agreement with {field}'
+    else:
+        cbar_label = value.replace('_', ' ').title()
+
     cmap = plt.get_cmap('coolwarm')
     all_summaries: list[tuple[str, str, list[tuple[float, float, pd.DataFrame]]]] = []
 
-    # 1) per-test: load, summarize, draw individual row (unchanged)…
+    # 1) per-test plots
     for name in test_names:
         df = load_results(name, filters)
         if df['test_maze_size'].nunique() <= 1 or df['test_percolation'].nunique() <= 1:
@@ -233,12 +248,15 @@ def plot_acc_vs_size_perc(test_names: list[str], filters: dict[str, Any] | None,
             dfm = df[df['model_name'] == m]
             tp = float(dfm['train_percolation'].iat[0])
             ts = float(dfm['train_maze_size'].iat[0])
-            heat = dfm.groupby(['test_percolation', 'test_maze_size'])['correct'].mean().unstack()
-            summary.append((tp, ts, heat))
+            mat = dfm.groupby(['test_percolation', 'test_maze_size'])[value].mean().unstack()
+            summary.append((tp, ts, mat))
 
         all_summaries.append((name, model_type, summary))
+
         fig_ind, axes_ind = plt.subplots(1, len(summary), figsize=(5 * len(summary), 4), sharey=True)
+        axes_ind = np.atleast_1d(axes_ind)
         first_star = None
+
         for j, (tp, ts, heat) in enumerate(summary):
             ax = axes_ind[j]
             cols = heat.columns
@@ -257,8 +275,8 @@ def plot_acc_vs_size_perc(test_names: list[str], filters: dict[str, Any] | None,
 
         fig_ind.subplots_adjust(wspace=0.05, right=0.85, top=0.9, bottom=0.15)
         cbar = fig_ind.colorbar(im, ax=axes_ind.tolist(), fraction=0.02, pad=0.02)
-        cbar.set_label('Test Accuracy')
-        # one‐entry legend
+        cbar.set_label(cbar_label)
+
         if first_star is not None:
             fig_ind.legend(
                 [first_star],
@@ -286,7 +304,6 @@ def plot_acc_vs_size_perc(test_names: list[str], filters: dict[str, Any] | None,
             dx = (cols[1] - cols[0]) if len(cols) > 1 else 1
             extent = [cols[0] - dx / 2, cols[-1] + dx / 2, heat.index[0], heat.index[-1]]
             im = ax.imshow(heat.values, origin='lower', aspect='auto', extent=extent, cmap=cmap, vmin=0, vmax=1)
-
             if j == 0:
                 ax.set_ylabel(f'{model_type}\nTest Perc.')
             if i == n_tests - 1:
@@ -302,35 +319,31 @@ def plot_acc_vs_size_perc(test_names: list[str], filters: dict[str, Any] | None,
                 edgecolors='gold',
                 facecolors='gold',
                 zorder=4,
-                clip_on=False,  # ← allow star outside plot
+                clip_on=False,
                 label=('Training distribution' if first_handle is None else '_nolegend_'),
             )
             if first_handle is None:
                 first_handle = handle
 
             ax.label_outer()
-            ax.margins(x=0.02, y=0.02)  # small padding so marker isn't clipped
+            ax.margins(x=0.02, y=0.02)
 
-    # after drawing all heatmaps and adding the colorbar…
     cbar = fig.colorbar(im, ax=axes.ravel().tolist(), fraction=0.02, pad=0.02)
-    cbar.set_label('Test Accuracy')
+    cbar.set_label(cbar_label)
 
-    # make room at bottom for a horizontal legend
     fig.subplots_adjust(
         hspace=0.1,
         wspace=0.05,
         left=0.1,
         right=0.85,
         top=0.92,
-        bottom=0.18,  # increased from 0.15 → 0.25
+        bottom=0.18,
     )
-
-    # one star‐entry legend, centered well below
     fig.legend(
         handles=[first_handle],
         labels=['Training distribution'],
         loc='lower center',
-        bbox_to_anchor=(0.5, -0.02),  # y shifted down
+        bbox_to_anchor=(0.5, -0.02),
         ncol=1,
     )
 
@@ -345,11 +358,11 @@ def plot_test_accuracies(test_names: list[str], plot_type: str, filters: dict[st
     handlers = {
         'overall_acc_vs_perc': plot_overall_acc_vs_perc,
         'acc_vs_perc': plot_acc_vs_perc,
-        'acc_vs_size_perc': plot_acc_vs_size_perc,
+        'value_vs_size_perc': plot_value_vs_size_perc,
     }
     if plot_type not in handlers:
         raise ValueError(f'Unknown plot type: {plot_type}')
-    handlers[plot_type](test_names, filters, combined_dir)
+    handlers[plot_type](test_names, filters, combined_dir)  # type: ignore
 
 
 def plot_mazes(

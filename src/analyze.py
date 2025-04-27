@@ -1,4 +1,4 @@
-from src.utils.analysis import plot_test_accuracies
+from src.utils.analysis import load_results, plot_test_accuracies
 from src.utils.config import PlotConfig
 
 # Instantiate and apply the plot configuration
@@ -25,6 +25,15 @@ def main() -> None:
     # ff_net
     ff_net_test_name = '2025-04-21_12:48:32'
 
+    # deadend_fill
+    deadend_fill_test_name = '2025-04-26_21:46:00'
+
+    # test_names = [ff_net_test_name, dt_net_test_name, it_net_test_name]
+    test_names = [deadend_fill_test_name]
+
+    df = load_results('2025-04-27_13:59:44')
+    print(df.head(20))
+    print(df.columns)
     # df = pd.read_csv(f'outputs/tests/{it_net_test_name}/results.csv')
     # print(df.head(20))
     # # Print unique values in each column
@@ -38,7 +47,6 @@ def main() -> None:
     #     train_percolation = df[df['model_name'] == model_name]['train_percolation'].unique()
     #     print(f'{model_name = }, {train_percolation[0] = }')
 
-    test_names = [ff_net_test_name, dt_net_test_name, it_net_test_name]
     # # Plot test accuracy versus test percolation for models trained with different percolations
     # plot_test_accuracies(
     #     it_net_test_name,
@@ -61,12 +69,12 @@ def main() -> None:
     #         },
     #     )
 
-    # # Create heatmaps
-    # plot_test_accuracies(
-    #     test_names,
-    #     'acc_vs_size_perc',
-    #     filters={'train_percolation': [0.0, 0.001, 0.01, 0.1, 0.5, 0.99], 'test_iter': 200},
-    # )
+    # Create heatmaps
+    plot_test_accuracies(
+        test_names,
+        'value_vs_size_perc',
+        # filters={'train_percolation': [0.0, 0.001, 0.01, 0.1, 0.5, 0.99], 'test_iter': 200},
+    )
 
     # # Plot test accuracy versus train percolation
     # plot_test_accuracies(
@@ -79,15 +87,15 @@ def main() -> None:
     #     },
     # )
 
-    # Plot overall test accuracy versus test percolation
-    plot_test_accuracies(
-        test_names,
-        'overall_acc_vs_perc',
-        filters={
-            'test_iter': 200,
-            'test_maze_size': [9, 11, 13, 15, 17, 19, 21, 23, 25, 27, 29],
-        },
-    )
+    # # Plot overall test accuracy versus test percolation
+    # plot_test_accuracies(
+    #     test_names,
+    #     'overall_acc_vs_perc',
+    #     filters={
+    #         'test_iter': 200,
+    #         'test_maze_size': [9, 11, 13, 15, 17, 19, 21, 23, 25, 27, 29],
+    #     },
+    # )
 
     # #Plot mazes
     # params = Hyperparameters()

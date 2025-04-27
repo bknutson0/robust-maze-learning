@@ -134,18 +134,27 @@ def specific_test(specific_test_params: TestParameters) -> DataFrame:
     """Run test on models, with specific parameters."""
     result = pd.DataFrame()
 
-    # Check that no test parameter is list, except for iters and model_name
+    # Check that no test parameter is list, except for iters, model_name, and compare_deadend_model
     for key, value in vars(specific_test_params).items():
-        if key != 'iters' and key != 'model_name' and isinstance(value, list):
+        if key not in ('iters', 'model_name') and isinstance(value, list):
             raise ValueError(f'Invalid type for {key}. Expected non-list, got {type(value)}.')
 
-    # Perform specific test
+    # Prepare loader
     test_loader = maze_loaders(specific_test_params)
+
+    # Optionally load deadend model
+    if getattr(specific_test_params, 'compare_deadend_fill', False):
+        deadend_fill = load_model(pretrained='deadend_fill')
+    else:
+        deadend_fill = None
+
+    # Iterate over models
     for model_name in specific_test_params.model_name:
         model = load_model(pretrained=model_name)
         hyperparameters = get_model_hyperparameters(model_name)
         if isinstance(model, torch.nn.Module):
             model.eval()
+
         for batch_idx, (inputs, solutions) in enumerate(test_loader):
             current_batch_size = len(inputs)
             maze_indices = list(
@@ -154,49 +163,52 @@ def specific_test(specific_test_params: TestParameters) -> DataFrame:
                     batch_idx * specific_test_params.batch_size + current_batch_size,
                 )
             )
+
+            # Model predictions for each iter
             predictions = model.predict(inputs, specific_test_params.iters)
             predictions = predictions if isinstance(predictions, list) else [predictions]
+
+            # Deadend model predictions if requested
+            if deadend_fill is not None:
+                deadend_fill_preds = deadend_fill.predict(inputs)
+
+            # Loop over iteration values
             for iter_index, iter_value in enumerate(specific_test_params.iters):  # type: ignore
                 matches_solution = compare_mazes(predictions[iter_index], solutions).cpu().numpy()
                 are_valid = is_valid_path(inputs, predictions[iter_index]).cpu().numpy()
                 are_minimal = is_minimal_path(inputs, predictions[iter_index], solutions).cpu().numpy()
-                # TODO: Add more tests, such as: count_start_neighbors, distance from center, count percolations, etc.
 
-                result = pd.concat(
-                    [
-                        result,
-                        pd.DataFrame(
-                            {
-                                'model_name': pd.Series([model_name] * current_batch_size, dtype='string'),
-                                'train_maze_size': pd.Series(
-                                    [hyperparameters.maze_size] * current_batch_size, dtype='Int64'
-                                ),
-                                'train_percolation': pd.Series(
-                                    [hyperparameters.percolation] * current_batch_size, dtype='Float64'
-                                ),
-                                'train_deadend_start': pd.Series(
-                                    [hyperparameters.deadend_start] * current_batch_size, dtype='Int64'
-                                ),
-                                'train_iter': pd.Series([hyperparameters.iters] * current_batch_size, dtype='Int64'),
-                                'maze_index': pd.Series(maze_indices, dtype='Int64'),
-                                'test_maze_size': pd.Series(
-                                    [specific_test_params.maze_size] * current_batch_size, dtype='Int64'
-                                ),
-                                'test_percolation': pd.Series(
-                                    [specific_test_params.percolation] * current_batch_size, dtype='Float64'
-                                ),
-                                'test_deadend_start': pd.Series(
-                                    [specific_test_params.deadend_start] * current_batch_size, dtype='Int64'
-                                ),
-                                'test_iter': pd.Series([iter_value] * current_batch_size, dtype='Int64'),
-                                'matches_solution': pd.Series(matches_solution, dtype='bool'),
-                                'valid': pd.Series(are_valid, dtype='bool'),
-                                'correct': pd.Series(are_minimal, dtype='bool'),
-                            }
-                        ),
-                    ],
-                    ignore_index=True,
-                )
+                # Compare to deadend model if applicable
+                if deadend_fill is not None:
+                    matches_deadend_fill = compare_mazes(predictions[iter_index], deadend_fill_preds).cpu().numpy()  # type: ignore
+
+                # Build row dict
+                row = {
+                    'model_name': pd.Series([model_name] * current_batch_size, dtype='string'),
+                    'train_maze_size': pd.Series([hyperparameters.maze_size] * current_batch_size, dtype='Int64'),
+                    'train_percolation': pd.Series([hyperparameters.percolation] * current_batch_size, dtype='Float64'),
+                    'train_deadend_start': pd.Series(
+                        [hyperparameters.deadend_start] * current_batch_size, dtype='Int64'
+                    ),
+                    'train_iter': pd.Series([hyperparameters.iters] * current_batch_size, dtype='Int64'),
+                    'maze_index': pd.Series(maze_indices, dtype='Int64'),
+                    'test_maze_size': pd.Series([specific_test_params.maze_size] * current_batch_size, dtype='Int64'),
+                    'test_percolation': pd.Series(
+                        [specific_test_params.percolation] * current_batch_size, dtype='Float64'
+                    ),
+                    'test_deadend_start': pd.Series(
+                        [specific_test_params.deadend_start] * current_batch_size, dtype='Int64'
+                    ),
+                    'test_iter': pd.Series([iter_value] * current_batch_size, dtype='Int64'),
+                    'matches_solution': pd.Series(matches_solution, dtype='bool'),
+                    'valid': pd.Series(are_valid, dtype='bool'),
+                    'correct': pd.Series(are_minimal, dtype='bool'),
+                }
+                if deadend_fill is not None:
+                    row['matches_deadend_fill'] = pd.Series(matches_deadend_fill, dtype='bool')
+
+                # Append to result
+                result = pd.concat([result, pd.DataFrame(row)], ignore_index=True)
 
     return result
 
