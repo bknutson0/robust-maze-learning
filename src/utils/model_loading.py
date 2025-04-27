@@ -3,6 +3,7 @@ import json
 import logging
 import os
 
+import numpy as np
 import torch
 from torch import nn
 
@@ -38,6 +39,8 @@ def load_model(model_name: str | None = None, pretrained: str | None = None, wei
             model_name = 'it_net'
         elif 'ff_net' in pretrained:
             model_name = 'ff_net'
+        elif 'deadend_fill' in pretrained:
+            model_name = 'deadend_fill'
         else:
             raise ValueError('Could not infer model type from pretrained path.')
 
@@ -102,16 +105,24 @@ def get_all_model_names() -> list[str]:
 
 def get_model_hyperparameters(model_name: str) -> Hyperparameters:
     """Get hyperparameters for a given model."""
-    # Load results.JSON file
     results_path = os.path.join(os.path.dirname(model_name), 'results.json')
+
+    # Algorithm case: no JSON ⇒ override only the four training fields to NaN
+    if not os.path.exists(results_path):
+        hp = Hyperparameters()
+        hp.maze_size = np.nan  # type: ignore
+        hp.percolation = np.nan
+        hp.deadend_start = np.nan  # type: ignore
+        hp.iters = np.nan  # type: ignore
+        return hp
+
+    # Model case: load JSON as before
     with open(results_path) as f:
         results = json.load(f)
 
-    # Get only valid keys for Hyperparameters
     hyperparams = results['hyperparameters']
     valid_keys = set(inspect.signature(Hyperparameters.__init__).parameters.keys())
     valid_keys.discard('self')
-    filtered_hyperparams = {k: v for k, v in hyperparams.items() if k in valid_keys}
+    filtered = {k: v for k, v in hyperparams.items() if k in valid_keys}
 
-    # Load filtered hyperparameters into Hyperparameters object
-    return Hyperparameters(**filtered_hyperparams)
+    return Hyperparameters(**filtered)

@@ -9,7 +9,7 @@ from matplotlib import pyplot as plt
 
 # Device configuration
 # Prioritize PREFERRED_CUDA > CUDA > MPS > CPU
-PREFERRED_CUDA = 1
+PREFERRED_CUDA = 2
 DEVICE = None
 if torch.cuda.is_available():
     if torch.cuda.device_count() > PREFERRED_CUDA:

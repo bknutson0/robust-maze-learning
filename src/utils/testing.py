@@ -144,7 +144,8 @@ def specific_test(specific_test_params: TestParameters) -> DataFrame:
     for model_name in specific_test_params.model_name:
         model = load_model(pretrained=model_name)
         hyperparameters = get_model_hyperparameters(model_name)
-        model.eval()
+        if isinstance(model, torch.nn.Module):
+            model.eval()
         for batch_idx, (inputs, solutions) in enumerate(test_loader):
             current_batch_size = len(inputs)
             maze_indices = list(
@@ -168,26 +169,26 @@ def specific_test(specific_test_params: TestParameters) -> DataFrame:
                             {
                                 'model_name': pd.Series([model_name] * current_batch_size, dtype='string'),
                                 'train_maze_size': pd.Series(
-                                    [hyperparameters.maze_size] * current_batch_size, dtype='int64'
+                                    [hyperparameters.maze_size] * current_batch_size, dtype='Int64'
                                 ),
                                 'train_percolation': pd.Series(
-                                    [hyperparameters.percolation] * current_batch_size, dtype='float64'
+                                    [hyperparameters.percolation] * current_batch_size, dtype='Float64'
                                 ),
                                 'train_deadend_start': pd.Series(
-                                    [hyperparameters.deadend_start] * current_batch_size, dtype='int64'
+                                    [hyperparameters.deadend_start] * current_batch_size, dtype='Int64'
                                 ),
-                                'train_iter': pd.Series([hyperparameters.iters] * current_batch_size, dtype='int64'),
-                                'maze_index': pd.Series(maze_indices, dtype='int64'),
+                                'train_iter': pd.Series([hyperparameters.iters] * current_batch_size, dtype='Int64'),
+                                'maze_index': pd.Series(maze_indices, dtype='Int64'),
                                 'test_maze_size': pd.Series(
-                                    [specific_test_params.maze_size] * current_batch_size, dtype='int64'
+                                    [specific_test_params.maze_size] * current_batch_size, dtype='Int64'
                                 ),
                                 'test_percolation': pd.Series(
-                                    [specific_test_params.percolation] * current_batch_size, dtype='float64'
+                                    [specific_test_params.percolation] * current_batch_size, dtype='Float64'
                                 ),
                                 'test_deadend_start': pd.Series(
-                                    [specific_test_params.deadend_start] * current_batch_size, dtype='int64'
+                                    [specific_test_params.deadend_start] * current_batch_size, dtype='Int64'
                                 ),
-                                'test_iter': pd.Series([iter_value] * current_batch_size, dtype='int64'),
+                                'test_iter': pd.Series([iter_value] * current_batch_size, dtype='Int64'),
                                 'matches_solution': pd.Series(matches_solution, dtype='bool'),
                                 'valid': pd.Series(are_valid, dtype='bool'),
                                 'correct': pd.Series(are_minimal, dtype='bool'),

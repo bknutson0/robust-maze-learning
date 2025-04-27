@@ -27,6 +27,7 @@ class DeadendFill(Model):
         super().__init__()
         self.name = 'deadend_fill'
 
+    @torch.no_grad()
     def predict(self, inputs: torch.Tensor, iters: int | list[int] = 1) -> torch.Tensor | list[torch.Tensor]:
         """Solve maze using deadend-filling algorithm."""
         # Check if the input is batched or single
@@ -74,6 +75,10 @@ class DeadendFill(Model):
         if not is_batched:
             predictions = predictions.squeeze(0)  # type: ignore
 
+        # If iters is list, return a list of predictions
+        if isinstance(iters, list):
+            return [torch.clone(predictions) for _ in iters]  # type: ignore
+
         return predictions  # type: ignore
 
     def _deadend_fill_maze(self, maze: TargetedLatticeMaze) -> TargetedLatticeMaze:
@@ -86,7 +91,7 @@ class DeadendFill(Model):
             connection_list=new_connection_list,
             start_pos=maze.start_pos,
             end_pos=maze.end_pos,
-        )
+        )  # type: ignore
 
         changed = True
         while changed:
@@ -103,13 +108,13 @@ class DeadendFill(Model):
                 connection_list=new_connection_list,
                 start_pos=maze.start_pos,
                 end_pos=maze.end_pos,
-            )
+            )  # type: ignore
 
         return TargetedLatticeMaze(
             connection_list=new_connection_list,
             start_pos=maze.start_pos,
             end_pos=maze.end_pos,
-        )
+        )  # type: ignore
 
     def _should_remove_node(self, maze: TargetedLatticeMaze, pos: tuple[int, int]) -> bool:
         """Check if a node should be removed."""
