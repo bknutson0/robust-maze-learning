@@ -1,4 +1,4 @@
-from src.utils.analysis import load_results, plot_test_accuracies
+from src.utils.analysis import load_results, plot_test
 from src.utils.config import PlotConfig
 
 # Instantiate and apply the plot configuration
@@ -9,31 +9,42 @@ plot_config.apply()
 def main() -> None:
     """Analyze test results."""
     # dt_net
+    dt_net_original_test_name = '2025-04-27_17:08:33'
     # Random initial weights without progressive learning dt-net models (03-01 to 03-03)
     # dt_net_test_name = '2025-03-04_12:26:21'
     # Random initial weights and progressive learning dt-net models (03-11 to 03-13)
     # dt_net_test_name = '2025-03-30_18:36:53'
-    dt_net_test_name = '2025-04-16_17:27:21'  # larger range of maze sizes
+    # dt_net_test_name = '2025-04-16_17:27:21'  # larger range of maze sizes
+    dt_net_test_name = '2025-04-27_14:07:53'  # Add matches_deadend_fill column
 
     # it_net
     # it_net_test_name = '2025-03-27_16:35:05'
     # it_net_test_name = '2025-03-29_15:40:05'
     # it_net_test_name = '2025-03-29_16:19:02'
     # it_net_test_name = '2025-03-30_11:45:35' # Contractive it_net and num_mazes = 100
-    it_net_test_name = '2025-04-16_17:27:53'  # larger range of maze sizes
+    # it_net_test_name = '2025-04-16_17:27:53'  # larger range of maze sizes
+    it_net_test_name = '2025-04-28_12:21:42'  # Add matches_deadend_fill column
 
     # ff_net
-    ff_net_test_name = '2025-04-21_12:48:32'
+    # ff_net_test_name = '2025-04-21_12:48:32'
+    ff_net_test_name = '2025-04-27_14:07:46'  # Add matches_deadend_fill column
 
     # deadend_fill
     deadend_fill_test_name = '2025-04-26_21:46:00'
 
     # test_names = [ff_net_test_name, dt_net_test_name, it_net_test_name]
-    test_names = [deadend_fill_test_name]
+    test_names = [
+        ff_net_test_name,
+        dt_net_test_name,
+        it_net_test_name,
+    ]
 
-    df = load_results('2025-04-27_13:59:44')
-    print(df.head(20))
-    print(df.columns)
+    df = load_results(dt_net_original_test_name)
+    # Count correct predictions at test_iter = 200
+    corrects = df[df['test_iter'] == 200]['matches_deadend_fill'].sum()
+    # Count total predictions at test_iter = 200
+    total = df[df['test_iter'] == 200]['matches_deadend_fill'].count()
+    print(f'{corrects = }, {total = }, {total-corrects = }, {corrects / total = :.4f}')
     # df = pd.read_csv(f'outputs/tests/{it_net_test_name}/results.csv')
     # print(df.head(20))
     # # Print unique values in each column
@@ -70,10 +81,11 @@ def main() -> None:
     #     )
 
     # Create heatmaps
-    plot_test_accuracies(
+    plot_test(
         test_names,
         'value_vs_size_perc',
-        # filters={'train_percolation': [0.0, 0.001, 0.01, 0.1, 0.5, 0.99], 'test_iter': 200},
+        filters={'train_percolation': [0.0, 0.001, 0.01, 0.1, 0.5, 0.99], 'test_iter': 200},
+        value='matches_deadend_fill',
     )
 
     # # Plot test accuracy versus train percolation

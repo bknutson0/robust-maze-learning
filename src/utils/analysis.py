@@ -352,7 +352,9 @@ def plot_value_vs_size_perc(
     plt.close(fig)
 
 
-def plot_test_accuracies(test_names: list[str], plot_type: str, filters: dict[str, Any] | None = None) -> None:
+def plot_test(
+    test_names: list[str], plot_type: str, filters: dict[str, Any] | None = None, value: str | None = None
+) -> None:
     """Entry point: routes to specific plot functions and manages combined output."""
     combined_dir = Path('outputs') / 'visuals' / 'plots'
     handlers = {
@@ -362,7 +364,7 @@ def plot_test_accuracies(test_names: list[str], plot_type: str, filters: dict[st
     }
     if plot_type not in handlers:
         raise ValueError(f'Unknown plot type: {plot_type}')
-    handlers[plot_type](test_names, filters, combined_dir)  # type: ignore
+    handlers[plot_type](test_names, filters, combined_dir, value)  # type: ignore
 
 
 def plot_mazes(
