@@ -1,9 +1,4 @@
 from src.utils.analysis import load_results, plot_test
-from src.utils.config import PlotConfig
-
-# Instantiate and apply the plot configuration
-plot_config = PlotConfig()
-plot_config.apply()
 
 
 def main() -> None:

@@ -481,6 +481,7 @@ def plot_mazes(
     plt.subplots_adjust(wspace=0.1, hspace=0.2)
     os.makedirs(os.path.dirname(file_name), exist_ok=True)
     plt.savefig(f'{file_name}.pdf', bbox_inches='tight')
+    logger.info(f'Saved maze plot to {file_name}.pdf')
     plt.close()
 
 
