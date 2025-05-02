@@ -67,7 +67,7 @@ def _load_mazes(
         seed=params.seed,
         maze_ctor=maze_ctor,
         maze_ctor_kwargs=maze_ctor_kwargs,
-        endpoint_kwargs=endpoint_kwargs,  # type: ignore
+        endpoint_kwargs=endpoint_kwargs,
     )
 
     # Create base maze dataset from configuration

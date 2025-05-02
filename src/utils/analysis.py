@@ -3,6 +3,7 @@ import os
 from pathlib import Path
 from typing import Any
 
+import matplotlib
 import matplotlib.colors as mcolors
 import matplotlib.pyplot as plt
 import numpy as np
@@ -352,6 +353,74 @@ def plot_value_vs_size_perc(
     plt.close(fig)
 
 
+def plot_accuracy_by_iter(
+    test_names: list[str],
+    filters: dict[str, Any] | None = None,
+    combined_dir: Path = Path('outputs/visuals/plots'),
+    value: str | None = None,
+) -> None:
+    """Plot test accuracy vs test_percolation for each model and test_iter values, saving one PDF per test."""
+    # Ensure combined_dir is a Path
+    combined_dir = Path(combined_dir)
+
+    for test_name in test_names:
+        # Load and optionally filter results
+        df = load_results(test_name, filters)
+
+        # Determine which column to plot
+        plot_col = value or 'correct'
+
+        # Identify unique models
+        models = sorted(df['model_name'].unique())
+        if not models:
+            raise ValueError(f"No models found for test '{test_name}'")
+
+        # Create one column per model
+        n_models = len(models)
+        fig, axes = plt.subplots(1, n_models, figsize=(6 * n_models, 6), sharey=True)
+        if n_models == 1:
+            axes = [axes]
+
+        # Colormap for iterations
+        cmap = matplotlib.cm.get_cmap('tab10')
+
+        for idx, ax in enumerate(axes):
+            model = models[idx]
+            df_model = df[df['model_name'] == model]
+            iterations = sorted(df_model['test_iter'].unique())
+            if not iterations:
+                continue
+            # Normalize iteration values for consistent coloring
+            norm = mcolors.Normalize(vmin=iterations[0], vmax=iterations[-1])
+
+            for iter_val in iterations:
+                df_iter = df_model[df_model['test_iter'] == iter_val]
+                summary = df_iter.groupby('test_percolation')[plot_col].mean().reset_index()
+                color = cmap(norm(iter_val))
+                ax.plot(
+                    summary['test_percolation'],
+                    summary[plot_col],
+                    label=f'iter={iter_val}',
+                    marker='o',
+                    linewidth=2,
+                    color=color,
+                )
+
+            ax.set(xlim=(0, 1), ylim=(0, 1), xlabel='Test Percolation', title=model)
+            if idx == 0:
+                ax.set_ylabel(plot_col.replace('_', ' ').capitalize())
+            ax.legend(title='Test Iter', loc='upper left', bbox_to_anchor=(1, 1))
+
+        plt.tight_layout()
+
+        # Save PDF in outputs/tests/<test_name>/
+        out_dir = Path('outputs') / 'tests' / test_name
+        out_dir.mkdir(parents=True, exist_ok=True)
+        out_path = out_dir / 'accuracy_by_iter.pdf'
+        fig.savefig(out_path, bbox_inches='tight')
+        plt.close(fig)
+
+
 def plot_test(
     test_names: list[str], plot_type: str, filters: dict[str, Any] | None = None, value: str | None = None
 ) -> None:
@@ -361,6 +430,7 @@ def plot_test(
         'overall_acc_vs_perc': plot_overall_acc_vs_perc,
         'acc_vs_perc': plot_acc_vs_perc,
         'value_vs_size_perc': plot_value_vs_size_perc,
+        'accuracy_by_iter': plot_accuracy_by_iter,
     }
     if plot_type not in handlers:
         raise ValueError(f'Unknown plot type: {plot_type}')

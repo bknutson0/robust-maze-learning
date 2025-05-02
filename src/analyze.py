@@ -40,11 +40,6 @@ def main() -> None:
     ]
 
     df = load_results(dt_net_original_test_name)
-    # Count correct predictions at test_iter = 200
-    corrects = df[df['test_iter'] == 200]['matches_deadend_fill'].sum()
-    # Count total predictions at test_iter = 200
-    total = df[df['test_iter'] == 200]['matches_deadend_fill'].count()
-    print(f'{corrects = }, {total = }, {total-corrects = }, {corrects / total = :.4f}')
     # df = pd.read_csv(f'outputs/tests/{it_net_test_name}/results.csv')
     # print(df.head(20))
     # # Print unique values in each column
@@ -80,13 +75,13 @@ def main() -> None:
     #         },
     #     )
 
-    # Create heatmaps
-    plot_test(
-        test_names,
-        'value_vs_size_perc',
-        filters={'train_percolation': [0.0, 0.001, 0.01, 0.1, 0.5, 0.99], 'test_iter': 200},
-        value='matches_deadend_fill',
-    )
+    # # Create heatmaps
+    # plot_test(
+    #     test_names,
+    #     plot_type='value_vs_size_perc',
+    #     filters={'train_percolation': [0.0, 0.001, 0.01, 0.1, 0.5, 0.99], 'test_iter': 200},
+    #     value='matches_deadend_fill',
+    # )
 
     # # Plot test accuracy versus train percolation
     # plot_test_accuracies(
@@ -119,6 +114,13 @@ def main() -> None:
     # solutions = solutions[maze_index : maze_index + 10]
     # print(inputs.sum().item() + solutions.sum().item())
     # plot_mazes(inputs, solutions, None, 'outputs/visuals/mazes/mazes')
+
+    #  Plot test accuracy versus test iters
+    plot_test(
+        test_names,
+        plot_type='accuracy_by_iter',
+        filters={'train_percolation': [0.0, 0.001, 0.01, 0.1, 0.5, 0.99], 'test_maze_size': 9},
+    )
 
 
 if __name__ == '__main__':
