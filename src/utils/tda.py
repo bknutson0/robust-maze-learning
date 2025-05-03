@@ -1,3 +1,4 @@
+# ruff: noqa: N803, N806
 """Based on https://arxiv.org/abs/1704.08382."""
 
 import pickle
@@ -15,38 +16,38 @@ from src.utils.testing import compare_mazes
 
 
 def get_diagram(
-    x: torch.Tensor,
+    X: torch.Tensor,
     dtype: DTypeLike = np.float32,
     embed_dim: int = 0,
     delay: int = 1,
     max_homo: int = 1,
     verbose: bool = True,
-) -> Tuple[List[np.ndarray], float]:
-    """Get the persistence diagram for data x."""
+) -> tuple[list[np.ndarray], float]:  # type: ignore
+    """Get the persistence diagram for data X."""
     # Convert from torch tensor to numpy array if necessary
-    if isinstance(x, torch.Tensor):
-        x = x.cpu().numpy()  # type: ignore
+    if isinstance(X, torch.Tensor):
+        X = X.cpu().numpy()  # type: ignore
 
     # Ensure desired precision
-    x = x.astype(dtype)
+    X = X.astype(dtype)  # type: ignore
 
     if verbose:
-        print(f'    Performing TDA with {embed_dim = }, {delay = }, and {x.shape = } ({x.nbytes / 1e9:.3f}GB)')
+        print(f'    Performing TDA with {embed_dim = }, {delay = }, and {X.shape = } ({X.nbytes / 1e9:.3f}GB)')
 
     # Flatten dimensions beyond first
-    x = x.reshape(x.shape[0], -1)
+    X = X.reshape(X.shape[0], -1)
     if verbose:
-        print(f'    Flattened {x.shape = }')
+        print(f'    Flattened {X.shape = }')
 
-    # Reduce dimensionality of x using SVD, if first dimension is smaller
-    F, P = x.shape
+    # Reduce dimensionality of X using SVD, if first dimension is smaller
+    F, P = X.shape
     if F < P:
-        x = reduce(x)
+        X = reduce(X)  # type: ignore
         if verbose:
-            print(f'    Reduced {x.shape = } ({x.nbytes / 1e9:.3f}GB)')
+            print(f'    Reduced {X.shape = } ({X.nbytes / 1e9:.3f}GB)')
 
-    # Compute distance matrix of sliding window embedding of x
-    distance_matrix = get_distance_matrix(x)
+    # Compute distance matriX of sliding window embedding of X
+    distance_matrix = get_distance_matrix(X)  # type: ignore
     max_distance = np.max(distance_matrix)
     if verbose:
         print(f'    Computed {distance_matrix.shape = } with {max_distance = :.3f}')
@@ -57,74 +58,79 @@ def get_diagram(
     return diagram, max_distance
 
 
-def get_distance_matrix(x: np.ndarray, embed_dim: int = 0, delay: int = 1, threshold: float = 1e-10) -> np.ndarray:
-    """Get distance matrix for rows of sliding window embedding of flattened data x."""
+def get_distance_matrix(X: np.ndarray, embed_dim: int = 0, delay: int = 1, threshold: float = 1e-10) -> np.ndarray:  # type: ignore
+    """Get distance matrix for rows of sliding window embedding of flattened data X."""
     # Ensure dimensions beyond first have been flattened
-    assert len(x.shape) == 2
+    if len(X.shape) != 2:
+        raise ValueError('Input array X must have exactly 2 dimensions.')
 
     # Window size must be less than total number of iterations
-    assert (embed_dim + 1) * delay < x.shape[0]
+    if (embed_dim + 1) * delay >= X.shape[0]:
+        raise ValueError('The window size (embed_dim + 1) * delay must be less than the number of rows in X.')
 
     if delay == 1:
-        # Compute squared distance matrix for x
-        squared_distance_matrix_x = np.square(squareform(pdist(x), checks=False))
+        # Compute squared distance matrix for X
+        squared_distance_matriX_X = np.square(squareform(pdist(X), checks=False))
 
-        # Compute distance matrix for sliding window embedding of x
+        # Compute distance matrix for sliding window embedding of X
         d = embed_dim
-        F = x.shape[0]  # frames
+        F = X.shape[0]  # frames
         W = F - d  # windows
-        squared_distance_matrix_SW = np.zeros(shape=(W, W))
+        squared_distance_matriX_SW = np.zeros(shape=(W, W))
         for i in range(W):
             for j in range(i + 1, W):
                 for k in range(d + 1):
-                    squared_distance_matrix_SW[i, j] += squared_distance_matrix_x[i + k, j + k]
-                squared_distance_matrix_SW[j, i] = squared_distance_matrix_SW[i, j]
-        assert np.all(squared_distance_matrix_SW == squared_distance_matrix_SW.T)
-        assert np.all(squared_distance_matrix_SW >= 0)
-        distance_matrix_SW = np.sqrt(squared_distance_matrix_SW)
+                    squared_distance_matriX_SW[i, j] += squared_distance_matriX_X[i + k, j + k]
+                squared_distance_matriX_SW[j, i] = squared_distance_matriX_SW[i, j]
+        if not np.all(squared_distance_matriX_SW == squared_distance_matriX_SW.T):
+            raise ValueError('The squared distance matrix is not symmetric.')
+        if not np.all(squared_distance_matriX_SW >= 0):
+            raise ValueError('All elements in the squared distance matrix must be non-negative.')
+        distance_matriX_SW = np.sqrt(squared_distance_matriX_SW)
 
     else:
         raise NotImplementedError
 
     # Zero distances that are smaller than threshold
-    distance_matrix_SW[distance_matrix_SW < threshold] = 0
+    distance_matriX_SW[distance_matriX_SW < threshold] = 0
 
-    return distance_matrix_SW
+    return distance_matriX_SW
 
 
-def get_sw(x, embed_dim, delay, verbose=False):
-    """Get normalized sliding window embedding of data, following
-    (Quasi)Periodicity Quantification in Video Data by Tralie & Perea.
+def get_sw(X: np.ndarray, embed_dim: int, delay: int, verbose: bool = False) -> np.ndarray:  # type: ignore
+    """Get normalized sliding window embedding of data.
+
+    Following (Quasi)Periodicity Quantification in Video Data by Tralie & Perea.
         embed_dim: d in their paper
         delay: tau in their paper
     """
-    x = x.reshape(x.shape[0], -1)
-    F, D = x.shape
+    X = X.reshape(X.shape[0], -1)
+    f, d = X.shape
 
     # Create sliding window embedding tensor
     window_size = embed_dim * delay
-    SW = np.zeros((F - window_size, (embed_dim + 1) * D))
-    for i in range(F - window_size):
-        SW[i] = x[i : i + window_size + 1 : delay].flatten()
+    sw = np.zeros((f - window_size, (embed_dim + 1) * d))
+    for i in range(f - window_size):
+        sw[i] = X[i : i + window_size + 1 : delay].flatten()
 
     if verbose:
-        print(f'{SW.shape = }')
+        print(f'{sw.shape = }')
 
-    return SW
+    return sw
 
 
-def reduce(x):
-    """Reduce dimensionality of x using SVD for memory efficiency"""
-    x = torch.tensor(x, device=DEVICE)
+def reduce(X: torch.Tensor) -> np.ndarray:  # type: ignore
+    """Reduce dimensionality of X using SVD for memory efficiency."""
+    X = torch.tensor(X, device=DEVICE)
     with torch.no_grad():
-        U, S, V = torch.linalg.svd(x, full_matrices=False)
-        x_reduced = U * S
+        U, S, V = torch.linalg.svd(X, full_matrices=False)
+        X_reduced = U * S
     torch.cuda.empty_cache()
-    return x_reduced.cpu().numpy()
+    return X_reduced.cpu().numpy()  # type: ignore
 
 
-def get_betti_nums(diagram, threshold):
-    """Calculate Betti numbers for persistence diagram D with given threshold"""
+def get_betti_nums(diagram: list[np.ndarray], threshold: float) -> np.ndarray:  # type: ignore
+    """Calculate Betti numbers for persistence diagram D with given threshold."""
     betti_nums = np.zeros(len(diagram), dtype=int)
 
     # If diagram corresponds to single point, return [1, 0]
@@ -134,11 +140,11 @@ def get_betti_nums(diagram, threshold):
 
     # Otherwise, calculate persistent homologies above threshold
     else:
-        max_death = get_max_death(diagram)
+        maX_death = get_max_death(diagram)
         for i in range(len(diagram)):
             for j in range(len(diagram[i])):
                 lifetime = diagram[i][j, 1] - diagram[i][j, 0]
-                if lifetime > threshold * max_death:
+                if lifetime > threshold * maX_death:
                     betti_nums[i] += 1
 
     return betti_nums
@@ -146,12 +152,12 @@ def get_betti_nums(diagram, threshold):
 
 def get_max_death(diagram):
     """Get maximum death in D, ignoring infinity"""
-    max_death = 0
+    maX_death = 0
     for i in range(len(diagram)):
         for j in range(len(diagram[i])):
             if diagram[i][j, 1] != np.inf:
-                max_death = max(max_death, diagram[i][j, 1])
-    return max_death
+                maX_death = maX(maX_death, diagram[i][j, 1])
+    return maX_death
 
 
 class Analysis:
@@ -167,26 +173,26 @@ class Analysis:
         dtype=np.float64,
         embed_dim=0,
         delay=1,
-        max_homo=1,
+        maX_homo=1,
         verbose=True,
     ):
         self.maze_sizes = maze_sizes
         self.percolations = percolations
         self.verbose = verbose
-        self.extrap_param_name, self.extrap_param = self.get_extrap_param()
+        self.eXtrap_param_name, self.eXtrap_param = self.get_eXtrap_param()
         self.num_mazes = num_mazes
         self.model = load_model(model_name)
         self.iters = iters
         self.dtype = dtype
         self.embed_dim = embed_dim
         self.delay = delay
-        self.max_homo = max_homo
-        self.corrects = np.zeros((len(self.extrap_param), self.num_mazes))
-        self.times = np.zeros((len(self.extrap_param), num_mazes), dtype=np.float32)
-        self.diagrams = np.zeros((len(self.extrap_param), num_mazes, 2), dtype=object)
-        self.max_distances = np.zeros((len(self.extrap_param), num_mazes), dtype=dtype)
+        self.maX_homo = maX_homo
+        self.corrects = np.zeros((len(self.eXtrap_param), self.num_mazes))
+        self.times = np.zeros((len(self.eXtrap_param), num_mazes), dtype=np.float32)
+        self.diagrams = np.zeros((len(self.eXtrap_param), num_mazes, 2), dtype=object)
+        self.maX_distances = np.zeros((len(self.eXtrap_param), num_mazes), dtype=dtype)
 
-    def get_extrap_param(self):
+    def get_eXtrap_param(self):
         if len(self.maze_sizes) > 1 and len(self.percolations) == 1:
             self.percolation = self.percolations[0]
             if self.verbose:
@@ -206,17 +212,17 @@ class Analysis:
         name = f'{self.model.name()}'
         for attr, value in self.__dict__.items():
             if attr == 'iters':
-                name += f'_{attr}-{min(value)},{max(value)}'
+                name += f'_{attr}-{min(value)},{maX(value)}'
             elif attr == 'dtype':
-                name += f'_dtype-{self.max_distances.dtype.name}'
+                name += f'_dtype-{self.maX_distances.dtype.name}'
             elif attr not in [
                 'model',
                 'corrects',
                 'times',
                 'diagrams',
-                'max_distances',
-                'extrap_param_name',
-                'extrap_param',
+                'maX_distances',
+                'eXtrap_param_name',
+                'eXtrap_param',
                 'verbose',
             ]:
                 name += f'_{attr}-{value}'
@@ -230,18 +236,18 @@ class Analysis:
 
     def analyze(self):
         """Perform TDA analysis on latent iterates of model while solving mazes"""
-        for i, param in enumerate(self.extrap_param):
+        for i, param in enumerate(self.eXtrap_param):
             # Print summary
             if self.verbose:
                 print(
-                    f'Analyzing {self.model.name()} on {self.num_mazes} mazes with {self.extrap_param_name} = {param} ...'
+                    f'Analyzing {self.model.name()} on {self.num_mazes} mazes with {self.eXtrap_param_name} = {param} ...'
                 )
 
             # Load mazes
             start_time = time.time()
-            if self.extrap_param_name == 'maze_size':
+            if self.eXtrap_param_name == 'maze_size':
                 inputs, solutions = get_mazes(maze_size=param, num_mazes=self.num_mazes)
-            elif self.extrap_param_name == 'percolation':
+            elif self.eXtrap_param_name == 'percolation':
                 inputs, solutions = get_mazes(percolation=param, num_mazes=self.num_mazes)
 
             if self.verbose:
@@ -264,12 +270,12 @@ class Analysis:
                 self.corrects[i, j] = compare_mazes(prediction, solution)[0]
 
                 # Perform TDA
-                diagram, max_distance = get_diagram(
-                    latent_series.squeeze(), self.dtype, self.embed_dim, self.delay, self.max_homo, verbose=False
+                diagram, maX_distance = get_diagram(
+                    latent_series.squeeze(), self.dtype, self.embed_dim, self.delay, self.maX_homo, verbose=False
                 )
                 self.diagrams[i, j, 0] = diagram[0]
                 self.diagrams[i, j, 1] = diagram[1]
-                self.max_distances[i, j] = max_distance
+                self.maX_distances[i, j] = maX_distance
 
                 # Save results
                 self.save()
@@ -283,14 +289,14 @@ class Analysis:
         if self.verbose:
             print(f'Analysis complete after {np.sum(self.times):.2f}s')
 
-    def get_betti_nums(self, threshold):
+    def get_betti_nums(self, threshold: float) -> np.ndarray:
         """Get Betti numbers for diagrams with given threshold"""
-        betti_nums = np.zeros((len(self.extrap_param), self.num_mazes, self.max_homo + 1), dtype=int)
-        for i in range(len(self.extrap_param)):
+        betti_nums = np.zeros((len(self.eXtrap_param), self.num_mazes, self.maX_homo + 1), dtype=int)
+        for i in range(len(self.eXtrap_param)):
             for j in range(self.num_mazes):
                 betti_nums[i, j] = get_betti_nums(self.diagrams[i, j], threshold)
         return betti_nums
 
-    def print_time(self):
+    def print_time(self) -> None:
         """Print time for analysis"""
         print(f'Time for analysis: {np.sum(self.times) / 60:.2f}min')
