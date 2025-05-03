@@ -140,11 +140,11 @@ def get_betti_nums(diagram: list[np.ndarray], threshold: float) -> np.ndarray:  
 
     # Otherwise, calculate persistent homologies above threshold
     else:
-        maX_death = get_max_death(diagram)
+        max_death = get_max_death(diagram)
         for i in range(len(diagram)):
             for j in range(len(diagram[i])):
                 lifetime = diagram[i][j, 1] - diagram[i][j, 0]
-                if lifetime > threshold * maX_death:
+                if lifetime > threshold * max_death:
                     betti_nums[i] += 1
 
     return betti_nums
@@ -165,34 +165,36 @@ class Analysis:
 
     def __init__(
         self,
-        maze_sizes=[9],
-        percolations=[0.0],
-        num_mazes=100,
-        model_name='dt_net',
-        iters=list(range(3001, 3401)),
-        dtype=np.float64,
-        embed_dim=0,
-        delay=1,
-        maX_homo=1,
-        verbose=True,
-    ):
+        maze_sizes: List[int] = [9],
+        percolations: List[float] = [0.0],
+        num_mazes: int = 100,
+        model_name: str = 'dt_net',
+        iters: List[int] = list(range(3001, 3401)),
+        dtype: DTypeLike = np.float64,
+        embed_dim: int = 0,
+        delay: int = 1,
+        max_homo: int = 1,
+        verbose: bool = True,
+    ) -> None:
+        """Initialize analysis object."""
         self.maze_sizes = maze_sizes
         self.percolations = percolations
         self.verbose = verbose
-        self.eXtrap_param_name, self.eXtrap_param = self.get_eXtrap_param()
+        self.extrap_param_name, self.extrap_param = self.get_extrap_param()
         self.num_mazes = num_mazes
         self.model = load_model(model_name)
         self.iters = iters
         self.dtype = dtype
         self.embed_dim = embed_dim
         self.delay = delay
-        self.maX_homo = maX_homo
-        self.corrects = np.zeros((len(self.eXtrap_param), self.num_mazes))
-        self.times = np.zeros((len(self.eXtrap_param), num_mazes), dtype=np.float32)
-        self.diagrams = np.zeros((len(self.eXtrap_param), num_mazes, 2), dtype=object)
-        self.maX_distances = np.zeros((len(self.eXtrap_param), num_mazes), dtype=dtype)
+        self.max_homo = max_homo
+        self.corrects = np.zeros((len(self.extrap_param), self.num_mazes))
+        self.times = np.zeros((len(self.extrap_param), num_mazes), dtype=np.float32)
+        self.diagrams = np.zeros((len(self.extrap_param), num_mazes, 2), dtype=object)
+        self.max_distances = np.zeros((len(self.extrap_param), num_mazes), dtype=dtype)
 
-    def get_extrap_param(self):
+    def get_extrap_param(self) -> tuple[str, list]:
+        """Get extrapolation paramter name and values."""
         if len(self.maze_sizes) > 1 and len(self.percolations) == 1:
             self.percolation = self.percolations[0]
             if self.verbose:
@@ -208,21 +210,22 @@ class Analysis:
                 'Invalid parameters: Either maze_sizes or percolations should have multiple values, but not both.'
             )
 
-    def get_name(self):
+    def get_name(self) -> str:
+        """Get name of analysis object."""
         name = f'{self.model.name()}'
         for attr, value in self.__dict__.items():
             if attr == 'iters':
-                name += f'_{attr}-{min(value)},{maX(value)}'
+                name += f'_{attr}-{min(value)},{max(value)}'
             elif attr == 'dtype':
-                name += f'_dtype-{self.maX_distances.dtype.name}'
+                name += f'_dtype-{self.max_distances.dtype.name}'
             elif attr not in [
                 'model',
                 'corrects',
                 'times',
                 'diagrams',
-                'maX_distances',
-                'eXtrap_param_name',
-                'eXtrap_param',
+                'max_distances',
+                'extrap_param_name',
+                'extrap_param',
                 'verbose',
             ]:
                 name += f'_{attr}-{value}'
@@ -236,18 +239,19 @@ class Analysis:
 
     def analyze(self) -> None:
         """Perform TDA analysis on latent iterates of model while solving mazes."""
-        for i, param in enumerate(self.eXtrap_param):
+        for i, param in enumerate(self.extrap_param):
             # Print summary
             if self.verbose:
                 print(
-                    f'Analyzing {self.model.name()} on {self.num_mazes} mazes with {self.eXtrap_param_name} = {param} ...'
+                    f'Analyzing {self.model.name()} on {self.num_mazes} mazes '
+                    f'with {self.extrap_param_name} = {param} ...'
                 )
 
             # Load mazes
             start_time = time.time()
-            if self.eXtrap_param_name == 'maze_size':
+            if self.extrap_param_name == 'maze_size':
                 inputs, solutions = get_mazes(maze_size=param, num_mazes=self.num_mazes)
-            elif self.eXtrap_param_name == 'percolation':
+            elif self.extrap_param_name == 'percolation':
                 inputs, solutions = get_mazes(percolation=param, num_mazes=self.num_mazes)
 
             if self.verbose:
@@ -270,12 +274,12 @@ class Analysis:
                 self.corrects[i, j] = compare_mazes(prediction, solution)[0]
 
                 # Perform TDA
-                diagram, maX_distance = get_diagram(
-                    latent_series.squeeze(), self.dtype, self.embed_dim, self.delay, self.maX_homo, verbose=False
+                diagram, max_distance = get_diagram(
+                    latent_series.squeeze(), self.dtype, self.embed_dim, self.delay, self.max_homo, verbose=False
                 )
                 self.diagrams[i, j, 0] = diagram[0]
                 self.diagrams[i, j, 1] = diagram[1]
-                self.maX_distances[i, j] = maX_distance
+                self.max_distances[i, j] = max_distance
 
                 # Save results
                 self.save()
@@ -291,8 +295,8 @@ class Analysis:
 
     def get_betti_nums(self, threshold: float) -> np.ndarray:
         """Get Betti numbers for diagrams with given threshold."""
-        betti_nums = np.zeros((len(self.eXtrap_param), self.num_mazes, self.maX_homo + 1), dtype=int)
-        for i in range(len(self.eXtrap_param)):
+        betti_nums = np.zeros((len(self.extrap_param), self.num_mazes, self.max_homo + 1), dtype=int)
+        for i in range(len(self.extrap_param)):
             for j in range(self.num_mazes):
                 betti_nums[i, j] = get_betti_nums(self.diagrams[i, j], threshold)
         return betti_nums
