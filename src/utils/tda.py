@@ -150,14 +150,14 @@ def get_betti_nums(diagram: list[np.ndarray], threshold: float) -> np.ndarray:  
     return betti_nums
 
 
-def get_max_death(diagram):
-    """Get maximum death in D, ignoring infinity"""
-    maX_death = 0
+def get_max_death(diagram: list[np.ndarray]) -> float:  # type: ignore
+    """Get maximum death in D, ignoring infinity."""
+    max_death = 0
     for i in range(len(diagram)):
         for j in range(len(diagram[i])):
             if diagram[i][j, 1] != np.inf:
-                maX_death = maX(maX_death, diagram[i][j, 1])
-    return maX_death
+                max_death = max(max_death, diagram[i][j, 1])
+    return max_death
 
 
 class Analysis:
@@ -192,7 +192,7 @@ class Analysis:
         self.diagrams = np.zeros((len(self.eXtrap_param), num_mazes, 2), dtype=object)
         self.maX_distances = np.zeros((len(self.eXtrap_param), num_mazes), dtype=dtype)
 
-    def get_eXtrap_param(self):
+    def get_extrap_param(self):
         if len(self.maze_sizes) > 1 and len(self.percolations) == 1:
             self.percolation = self.percolations[0]
             if self.verbose:
@@ -234,8 +234,8 @@ class Analysis:
         with open(file_name, 'wb') as f:
             pickle.dump(self, f)
 
-    def analyze(self):
-        """Perform TDA analysis on latent iterates of model while solving mazes"""
+    def analyze(self) -> None:
+        """Perform TDA analysis on latent iterates of model while solving mazes."""
         for i, param in enumerate(self.eXtrap_param):
             # Print summary
             if self.verbose:
@@ -290,7 +290,7 @@ class Analysis:
             print(f'Analysis complete after {np.sum(self.times):.2f}s')
 
     def get_betti_nums(self, threshold: float) -> np.ndarray:
-        """Get Betti numbers for diagrams with given threshold"""
+        """Get Betti numbers for diagrams with given threshold."""
         betti_nums = np.zeros((len(self.eXtrap_param), self.num_mazes, self.maX_homo + 1), dtype=int)
         for i in range(len(self.eXtrap_param)):
             for j in range(self.num_mazes):
@@ -298,5 +298,5 @@ class Analysis:
         return betti_nums
 
     def print_time(self) -> None:
-        """Print time for analysis"""
+        """Print time for analysis."""
         print(f'Time for analysis: {np.sum(self.times) / 60:.2f}min')
