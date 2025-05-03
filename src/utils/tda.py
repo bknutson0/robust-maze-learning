@@ -165,11 +165,11 @@ class Analysis:
 
     def __init__(
         self,
-        maze_sizes: List[int] = [9],
-        percolations: List[float] = [0.0],
+        maze_sizes: list[int] = [9],
+        percolations: list[float] = [0.0],
         num_mazes: int = 100,
         model_name: str = 'dt_net',
-        iters: List[int] = list(range(3001, 3401)),
+        iters: list[int] = list(range(3001, 3401)),
         dtype: DTypeLike = np.float64,
         embed_dim: int = 0,
         delay: int = 1,
