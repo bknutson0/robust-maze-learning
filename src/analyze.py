@@ -29,18 +29,19 @@ def main() -> None:
 
     # test_names = [ff_net_test_name, dt_net_test_name, it_net_test_name]
     test_names = [
+        # dt_net_original_test_name
         ff_net_test_name,
         dt_net_test_name,
         it_net_test_name,
+        # deadend_fill_test_name
     ]
 
     df = load_results(dt_net_original_test_name)
-    # df = pd.read_csv(f'outputs/tests/{it_net_test_name}/results.csv')
-    # print(df.head(20))
-    # # Print unique values in each column
-    # for column in df.columns:
-    #     unique_values = df[column].unique()
-    #     print(f'{column}: {unique_values}')
+    print(df.head(20))
+    # Print unique values in each column
+    for column in df.columns:
+        unique_values = df[column].unique()
+        print(f'{column}: {unique_values}')
 
     # # For each model_name, print train_percolation
     # model_names = df['model_name'].unique().tolist()
@@ -70,13 +71,13 @@ def main() -> None:
     #         },
     #     )
 
-    # # Create heatmaps
-    # plot_test(
-    #     test_names,
-    #     plot_type='value_vs_size_perc',
-    #     filters={'train_percolation': [0.0, 0.001, 0.01, 0.1, 0.5, 0.99], 'test_iter': 200},
-    #     value='matches_deadend_fill',
-    # )
+    # Create heatmap for agreement of dt_net_original with deadend_fill
+    plot_test(
+        test_names,
+        plot_type='value_vs_size_perc',
+        filters={'percolation': [0.0, 0.001, 0.1, 0.3, 0.5, 0.7, 0.9, 0.99], 'test_iter': 200},
+        value='matches_deadend_fill',
+    )
 
     # # Plot test accuracy versus train percolation
     # plot_test_accuracies(
@@ -110,12 +111,12 @@ def main() -> None:
     # print(inputs.sum().item() + solutions.sum().item())
     # plot_mazes(inputs, solutions, None, 'outputs/visuals/mazes/mazes')
 
-    #  Plot test accuracy versus test iters
-    plot_test(
-        test_names,
-        plot_type='accuracy_by_iter',
-        filters={'train_percolation': [0.0, 0.001, 0.01, 0.1, 0.5, 0.99], 'test_maze_size': 9},
-    )
+    # #  Plot test accuracy versus test iters
+    # plot_test(
+    #     test_names,
+    #     plot_type='accuracy_by_iter',
+    #     filters={'train_percolation': [0.0, 0.001, 0.01, 0.1, 0.5, 0.99], 'test_maze_size': 9},
+    # )
 
 
 if __name__ == '__main__':

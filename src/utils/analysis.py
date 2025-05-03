@@ -1,5 +1,6 @@
 import logging
 import os
+from collections.abc import Sequence
 from pathlib import Path
 from typing import Any
 
@@ -217,136 +218,176 @@ def plot_acc_vs_perc(test_names: list[str], filters: dict[str, Any] | None, comb
 
 def plot_value_vs_size_perc(
     test_names: list[str],
-    filters: dict[str, Any] | None,
-    combined_dir: Path,
+    filters: dict[str, Any] | None = None,
+    combined_dir: Path = Path('outputs') / 'visuals' / 'plots',
     value: str = 'correct',
 ) -> None:
     """Plot heatmaps of `value` vs size & percolation, per test and combined."""
-    # infer a nice label
+    # verify column exists
+    sample_df = load_results(test_names[0], filters)
+    if value not in sample_df.columns:
+        raise KeyError(f'Column not found: {value}')
+
+    # infer colorbar label
     if value == 'correct':
         cbar_label = 'Test Accuracy'
     elif value.startswith('matches_'):
-        # e.g. "matches_deadend_fill" → "Agreement with Deadend Fill"
         field = value[len('matches_') :].replace('_', ' ').title()
         cbar_label = f'Agreement with {field}'
     else:
         cbar_label = value.replace('_', ' ').title()
 
     cmap = plt.get_cmap('coolwarm')
-    all_summaries: list[tuple[str, str, list[tuple[float, float, pd.DataFrame]]]] = []
+    all_summaries: list[tuple[str, str, list[tuple[str, float | None, float | None, pd.DataFrame]]]] = []
 
-    # 1) per-test plots
+    # 1) collect per-test summaries
     for name in test_names:
         df = load_results(name, filters)
-        if df['test_maze_size'].nunique() <= 1 or df['test_percolation'].nunique() <= 1:
-            raise ValueError('Need multiple sizes and percolation values.')
-
         model_type = infer_model_type(df)
-        summary: list[tuple[float, float, pd.DataFrame]] = []
-        for m in sorted(
-            df['model_name'].unique(), key=lambda m: df.loc[df['model_name'] == m, 'train_percolation'].iat[0]
-        ):
-            dfm = df[df['model_name'] == m]
-            tp = float(dfm['train_percolation'].iat[0])
-            ts = float(dfm['train_maze_size'].iat[0])
-            mat = dfm.groupby(['test_percolation', 'test_maze_size'])[value].mean().unstack()
-            summary.append((tp, ts, mat))
 
+        summary: list[tuple[str, float | None, float | None, pd.DataFrame]] = []
+        for m in df['model_name'].unique():
+            dfm = df[df['model_name'] == m]
+            tp = float(dfm['train_percolation'].iat[0]) if pd.notna(dfm['train_percolation'].iat[0]) else None
+            ts = float(dfm['train_maze_size'].iat[0]) if pd.notna(dfm['train_maze_size'].iat[0]) else None
+            heat = dfm.groupby(['test_percolation', 'test_maze_size'])[value].mean().unstack(fill_value=np.nan)
+            summary.append((m, tp, ts, heat))
+
+        # sort so NaNs go last
+        summary.sort(key=lambda x: x[1] if x[1] is not None else -1)
         all_summaries.append((name, model_type, summary))
 
-        fig_ind, axes_ind = plt.subplots(1, len(summary), figsize=(5 * len(summary), 4), sharey=True)
-        axes_ind = np.atleast_1d(axes_ind)
-        first_star = None
+        # 2) per-test heatmaps
+        n = len(summary)
+        fig, axes = plt.subplots(1, n, figsize=(4 * n, 4), sharey=True, squeeze=False)
+        axes = axes.flatten()
 
-        for j, (tp, ts, heat) in enumerate(summary):
-            ax = axes_ind[j]
+        # dynamic font sizes
+        _, fh = fig.get_size_inches()
+        title_fs = max(12, fh * 5)
+        label_fs = max(10, fh * 4)
+        tick_fs = max(8, fh * 3)
+
+        first_star = None
+        for ax, (m, tp, ts, heat) in zip(axes, summary, strict=False):
             cols = heat.columns
             dx = (cols[1] - cols[0]) if len(cols) > 1 else 1
             extent = [cols[0] - dx / 2, cols[-1] + dx / 2, heat.index[0], heat.index[-1]]
-            im = ax.imshow(heat.values, origin='lower', aspect='auto', extent=extent, cmap=cmap, vmin=0, vmax=1)
-            ax.set_xlabel('Maze Size')
-            if j == 0:
-                ax.set_ylabel(f'{model_type}\nTest Perc.')
-            ax.set_title(f'Train Perc.\n= {tp:.3f}')
-            star = ax.scatter(ts, tp, marker='*', s=300, edgecolors='gold', facecolors='gold', zorder=4, clip_on=False)
-            if first_star is None:
-                first_star = star
-            ax.label_outer()
-            ax.margins(0.02)
-
-        fig_ind.subplots_adjust(wspace=0.05, right=0.85, top=0.9, bottom=0.15)
-        cbar = fig_ind.colorbar(im, ax=axes_ind.tolist(), fraction=0.02, pad=0.02)
-        cbar.set_label(cbar_label)
-
-        if first_star is not None:
-            fig_ind.legend(
-                [first_star],
-                ['Training distribution'],
-                loc='lower center',
-                bbox_to_anchor=(0.5, -0.4),
-                ncol=1,
+            im = ax.imshow(
+                heat.values,
+                origin='lower',
+                aspect='auto',
+                extent=extent,
+                cmap=cmap,
+                vmin=0,
+                vmax=1,
             )
+
+            # if only one subplot, extract "dt_net/original" from "models/dt_net/original.pth"
+            if n == 1 and 'models/' in m and m.endswith('.pth'):
+                sub = m.split('models/', 1)[1]  # "dt_net/original.pth"
+                title = os.path.splitext(sub)[0]  # "dt_net/original"
+            elif n == 1:
+                title = m
+            else:
+                title = f'Train Perc. = {tp:.3f}' if tp is not None else 'Train Perc. = NaN'
+
+            ax.set_title(title, fontsize=title_fs)
+            ax.set_xlabel('Maze Size', fontsize=label_fs)
+            if ax is axes[0]:
+                ax.set_ylabel('Test Perc.', fontsize=label_fs)
+            ax.tick_params(labelsize=tick_fs)
+
+            if tp is not None and ts is not None:
+                star = ax.scatter(
+                    ts,
+                    tp,
+                    marker='*',
+                    s=300,
+                    edgecolors='gold',
+                    facecolors='gold',
+                    zorder=4,
+                )
+                if first_star is None:
+                    first_star = star
+
+        # colorbar
+        cbar = fig.colorbar(im, ax=axes.tolist(), fraction=0.06, pad=0.03, shrink=0.9)
+        cbar.ax.tick_params(labelsize=tick_fs)
+        cbar.ax.yaxis.label.set_size(label_fs)
+        cbar.set_label(cbar_label, fontsize=label_fs)
+
         out_dir = Path('outputs') / 'tests' / name
         out_dir.mkdir(parents=True, exist_ok=True)
-        fig_ind.savefig(out_dir / 'acc_vs_size_perc.pdf', bbox_inches='tight')
-        plt.close(fig_ind)
+        fig.savefig(out_dir / 'acc_vs_size_perc.pdf', bbox_inches='tight')
+        plt.close(fig)
 
-    # 2) Combined grid across tests × models
+    # 3) combined grid
+    if not all_summaries:
+        return
+
     n_tests = len(all_summaries)
     n_models = len(all_summaries[0][2])
-    fig, axes = plt.subplots(n_tests, n_models, sharex=True, sharey=True, figsize=(6 * n_models, 4 * n_tests))
+    fig, axes = plt.subplots(
+        n_tests,
+        n_models,
+        figsize=(4 * n_models, 3.5 * n_tests),
+        sharex=True,
+        sharey=True,
+    )
     axes = np.atleast_2d(axes)
-    first_handle = None
 
+    _, fh = fig.get_size_inches()
+    title_fs = max(12, fh * 5)
+    label_fs = max(10, fh * 4)
+    tick_fs = max(8, fh * 3)
+
+    first_handle = None
     for i, (_name, model_type, summary) in enumerate(all_summaries):
-        for j, (tp, ts, heat) in enumerate(summary):
+        for j, (_m, tp, ts, heat) in enumerate(summary):
             ax = axes[i, j]
             cols = heat.columns
             dx = (cols[1] - cols[0]) if len(cols) > 1 else 1
             extent = [cols[0] - dx / 2, cols[-1] + dx / 2, heat.index[0], heat.index[-1]]
-            im = ax.imshow(heat.values, origin='lower', aspect='auto', extent=extent, cmap=cmap, vmin=0, vmax=1)
-            if j == 0:
-                ax.set_ylabel(f'{model_type}\nTest Perc.')
-            if i == n_tests - 1:
-                ax.set_xlabel('Maze Size')
-            if i == 0:
-                ax.set_title(f'Train Perc.\n={tp:.3f}')
-
-            handle = ax.scatter(
-                ts,
-                tp,
-                marker='*',
-                s=400,
-                edgecolors='gold',
-                facecolors='gold',
-                zorder=4,
-                clip_on=False,
-                label=('Training distribution' if first_handle is None else '_nolegend_'),
+            im = ax.imshow(
+                heat.values,
+                origin='lower',
+                aspect='auto',
+                extent=extent,
+                cmap=cmap,
+                vmin=0,
+                vmax=1,
             )
-            if first_handle is None:
-                first_handle = handle
 
-            ax.label_outer()
-            ax.margins(x=0.02, y=0.02)
+            ax.set_title(
+                f'Train Perc. = {tp:.3f}' if tp is not None else 'Train Perc. = NaN',
+                fontsize=title_fs,
+            )
+            if i == n_tests - 1:
+                ax.set_xlabel('Maze Size', fontsize=label_fs)
+            if j == 0:
+                ax.set_ylabel(f'{model_type}\nTest Perc.', fontsize=label_fs)
+            ax.tick_params(labelsize=tick_fs)
 
-    cbar = fig.colorbar(im, ax=axes.ravel().tolist(), fraction=0.02, pad=0.02)
-    cbar.set_label(cbar_label)
+            if tp is not None and ts is not None:
+                handle = ax.scatter(
+                    ts,
+                    tp,
+                    marker='*',
+                    s=300,
+                    edgecolors='gold',
+                    facecolors='gold',
+                    zorder=4,
+                    clip_on=False,
+                    label=('Training distribution' if first_handle is None else '_nolegend_'),
+                )
+                if first_handle is None:
+                    first_handle = handle
 
-    fig.subplots_adjust(
-        hspace=0.1,
-        wspace=0.05,
-        left=0.1,
-        right=0.85,
-        top=0.92,
-        bottom=0.18,
-    )
-    fig.legend(
-        handles=[first_handle],
-        labels=['Training distribution'],
-        loc='lower center',
-        bbox_to_anchor=(0.5, -0.02),
-        ncol=1,
-    )
+    cbar = fig.colorbar(im, ax=axes.ravel().tolist(), fraction=0.06, pad=0.03, shrink=0.9)
+    cbar.ax.tick_params(labelsize=tick_fs)
+    cbar.ax.yaxis.label.set_size(label_fs)
+    cbar.set_label(cbar_label, fontsize=label_fs)
 
     combined_dir.mkdir(parents=True, exist_ok=True)
     fig.savefig(combined_dir / 'combined_acc_vs_size_perc.pdf', bbox_inches='tight')
@@ -437,52 +478,107 @@ def plot_test(
     handlers[plot_type](test_names, filters, combined_dir, value)  # type: ignore
 
 
+# def plot_mazes(
+#     inputs: torch.Tensor | None = None,
+#     solutions: torch.Tensor | None = None,
+#     predictions: torch.Tensor | None = None,
+#     file_name: str = 'outputs/visuals/mazes/mazes',
+# ) -> None:
+#     """Plot mazes inputs, solutions, and/or predictions, batched or not, and save the plot to a file."""
+#     if all(x is None for x in [inputs, solutions, predictions]):
+#         raise ValueError('At least one of inputs, solutions, or predictions must be provided.')
+
+#     for tensor, name in zip([inputs, solutions, predictions], ['Inputs', 'Solutions', 'Predictions'], strict=False):
+#         if tensor is not None and tensor.size(0) == 0:
+#             raise ValueError(f'{name} tensor has zero batch size.')
+
+#     if inputs is not None and inputs.dim() == 3:
+#         inputs = inputs.unsqueeze(0)
+#     if solutions is not None and solutions.dim() == 2:
+#         solutions = solutions.unsqueeze(0)
+#     if predictions is not None and predictions.dim() == 2:
+#         predictions = predictions.unsqueeze(0)
+
+#     batch_size = max(x.size(0) if x is not None else 0 for x in [inputs, solutions, predictions])
+
+#     mazes = [
+#         (maze, title)
+#         for maze, title in zip([inputs, solutions, predictions], ['Inputs', 'Solutions', 'Predictions'], strict=False)
+#         if maze is not None
+#     ]
+#     num_cols = len(mazes)
+
+#     fig, axes = plt.subplots(batch_size, num_cols, figsize=(3.5 * num_cols, 3.5 * batch_size), dpi=300, squeeze=False)
+
+#     for row in range(batch_size):
+#         for col, (maze, title) in enumerate(mazes):
+#             ax = axes[row, col] if batch_size > 1 else axes[col]
+#             ax.imshow(
+#                 maze[row].permute(1, 2, 0).cpu().numpy() if title == 'Inputs' else maze[row].cpu().numpy(), cmap='gray'
+#             )
+#             ax.set_title(title, fontsize=config.subplot_title_size, pad=10)
+#             ax.axis('off')
+
+#     plt.subplots_adjust(wspace=0.1, hspace=0.2)
+#     os.makedirs(os.path.dirname(file_name), exist_ok=True)
+#     plt.savefig(f'{file_name}.pdf', bbox_inches='tight')
+#     logger.info(f'Saved maze plot to {file_name}.pdf')
+#     plt.close()
+
+
 def plot_mazes(
-    inputs: torch.Tensor | None = None,
-    solutions: torch.Tensor | None = None,
-    predictions: torch.Tensor | None = None,
+    names_mazes: Sequence[tuple[str, object]],
     file_name: str = 'outputs/visuals/mazes/mazes',
+    dpi: int = 300,
+    figsize: float = 3.5,
+    title_pad: float = 8,
 ) -> None:
-    """Plot mazes inputs, solutions, and/or predictions, batched or not, and save the plot to a file."""
-    if all(x is None for x in [inputs, solutions, predictions]):
-        raise ValueError('At least one of inputs, solutions, or predictions must be provided.')
+    """Plot each (name, tensor or list of tensors) as a column; rows = batch items."""
+    # Validate input
+    if not names_mazes:
+        raise ValueError('Need at least one (name, tensor) pair.')
 
-    for tensor, name in zip([inputs, solutions, predictions], ['Inputs', 'Solutions', 'Predictions'], strict=False):
-        if tensor is not None and tensor.size(0) == 0:
-            raise ValueError(f'{name} tensor has zero batch size.')
+    # Prepare tensors
+    proc = []
+    for name, mazes in names_mazes:
+        x = torch.stack(mazes, 0) if isinstance(mazes, list | tuple) else mazes
+        if not torch.is_tensor(x):
+            raise TypeError(f"Values for '{name}' must be a torch.Tensor or list of them.")
+        if x.ndim == 2 or (x.ndim == 3 and x.shape[0] in (1, 3)):
+            x = x.unsqueeze(0)
+        if x.ndim not in (3, 4) or x.shape[0] == 0:
+            raise ValueError(f"Invalid shape {tuple(x.shape)} for '{name}'.")
+        proc.append((name, x))
 
-    if inputs is not None and inputs.dim() == 3:
-        inputs = inputs.unsqueeze(0)
-    if solutions is not None and solutions.dim() == 2:
-        solutions = solutions.unsqueeze(0)
-    if predictions is not None and predictions.dim() == 2:
-        predictions = predictions.unsqueeze(0)
+    # Create subplots
+    n_cols = len(proc)
+    batch = max(x.shape[0] for _, x in proc)
+    fig, axes = plt.subplots(
+        batch,
+        n_cols,
+        figsize=(figsize * n_cols, figsize * batch),
+        dpi=dpi,
+        squeeze=False,
+    )
 
-    batch_size = max(x.size(0) if x is not None else 0 for x in [inputs, solutions, predictions])
-
-    mazes = [
-        (maze, title)
-        for maze, title in zip([inputs, solutions, predictions], ['Inputs', 'Solutions', 'Predictions'], strict=False)
-        if maze is not None
-    ]
-    num_cols = len(mazes)
-
-    fig, axes = plt.subplots(batch_size, num_cols, figsize=(3.5 * num_cols, 3.5 * batch_size), dpi=300, squeeze=False)
-
-    for row in range(batch_size):
-        for col, (maze, title) in enumerate(mazes):
-            ax = axes[row, col] if batch_size > 1 else axes[col]
-            ax.imshow(
-                maze[row].permute(1, 2, 0).cpu().numpy() if title == 'Inputs' else maze[row].cpu().numpy(), cmap='gray'
-            )
-            ax.set_title(title, fontsize=config.subplot_title_size, pad=10)
+    # Plot images
+    for r in range(batch):
+        for c, (name, x) in enumerate(proc):
+            ax = axes[r, c]
+            img = x[r].cpu().numpy()
+            if img.ndim == 3:  # C×H×W → H×W×C
+                img = img.transpose(1, 2, 0)
+            ax.imshow(img, cmap='gray' if img.ndim == 2 else None)
+            ax.set_title(name, pad=title_pad)
             ax.axis('off')
 
-    plt.subplots_adjust(wspace=0.1, hspace=0.2)
+    # Adjust spacing
+    fig.tight_layout(pad=(title_pad / 72) + 0.1)
+
+    # Save figure
     os.makedirs(os.path.dirname(file_name), exist_ok=True)
-    plt.savefig(f'{file_name}.pdf', bbox_inches='tight')
-    logger.info(f'Saved maze plot to {file_name}.pdf')
-    plt.close()
+    fig.savefig(f'{file_name}.pdf', bbox_inches='tight')
+    plt.close(fig)
 
 
 def plot_predictions(test_name: str, correct: bool | None = None) -> None:
