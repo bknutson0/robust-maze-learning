@@ -124,6 +124,9 @@ class TestParameters:
     # it_net specific
     tolerance: float = TOLERANCE  # Tolerance for convergence
 
+    # pi_net specific
+    threshold: int | str = 'default'
+
     def are_mostly_single_valued(self) -> bool:
         """Check if all parameters are single-valued, except model_name and iters."""
         return all(

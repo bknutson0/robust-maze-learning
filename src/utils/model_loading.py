@@ -5,12 +5,15 @@ import os
 
 import numpy as np
 import torch
+import yaml
+from omegaconf import OmegaConf
 from torch import nn
 
 from src.models.dt_net import DTNet
 from src.models.ff_net import FFNet
 from src.models.it_net import ITNet
 from src.models.model import DeadendFill, Model
+from src.models.pi_net import PINet
 from src.utils.config import DEVICE, LOGGING_LEVEL, Hyperparameters
 
 # Create logger
@@ -41,8 +44,41 @@ def load_model(model_name: str | None = None, pretrained: str | None = None, wei
             model_name = 'ff_net'
         elif 'deadend_fill' in pretrained:
             model_name = 'deadend_fill'
+        elif 'pi_net' in pretrained:
+            model_name = 'pi_net'
         else:
             raise ValueError('Could not infer model type from pretrained path.')
+
+    if model_name == 'pi_net':
+        if weight_init:
+            raise ValueError('weight_init is not supported for pi_net; please use pretrained.')
+
+        if not pretrained:
+            raise ValueError('pi_net requires a pretrained .pth path.')
+
+        # derive config path alongside the .pth
+        cfg_path = os.path.join(os.path.dirname(pretrained), 'config.yaml')
+        if not os.path.isfile(cfg_path):
+            raise FileNotFoundError(f'Config file not found at {cfg_path}')
+
+        # load and patch config
+        with open(cfg_path) as f:
+            cfg_dict = yaml.load(f, Loader=yaml.FullLoader)
+        cfg = OmegaConf.create(cfg_dict)
+        cfg.problem.deq.jacobian_factor = 1.0
+        cfg.problem.model.model_path = pretrained
+
+        # instantiate with width & config
+        model = PINet(width=cfg.problem.model.width, in_channels=3, config=cfg)
+        # load 'net' weights
+        sd = torch.load(pretrained, map_location=DEVICE, weights_only=True).get('net', {})
+        # strip DataParallel keys
+        sd = {k.replace('module.', ''): v for k, v in sd.items()}
+        model.load_state_dict(sd, strict=True)
+
+        model.to(DEVICE)
+        logger.info(f'Loaded pi_net from {pretrained} to device: {DEVICE}')
+        return model
 
     # Initialize model
     if 'dt_net' in model_name:
@@ -51,6 +87,8 @@ def load_model(model_name: str | None = None, pretrained: str | None = None, wei
         model = ITNet()
     elif 'ff_net' in model_name:
         model = FFNet()
+    elif 'pi_net' in model_name:
+        model = PINet()
     elif 'deadend_fill' in model_name:
         model = DeadendFill()
         return model
