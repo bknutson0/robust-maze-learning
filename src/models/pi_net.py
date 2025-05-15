@@ -1,10 +1,14 @@
 """Based on deq_v3.py from "Path Independent Equilibrium Models ..." by Anil et. al."""
 
+import os
+
 import numpy as np
 import torch
 import torch.autograd as autograd
 import torch.nn as nn
 import torch.nn.functional as F
+import yaml
+from omegaconf import OmegaConf
 from torch.utils.tensorboard.writer import SummaryWriter
 
 from src.models.base_net import BaseNet
@@ -14,6 +18,32 @@ from src.utils.pi_net.optimization import weight_norm
 from src.utils.pi_net.solvers import broyden  # noqa: F401
 
 hyperparams = TestParameters()
+
+
+# ——— Quick PI‑Net config loader ———
+# assumes your structure: project_root/models/pi_net/config.yaml
+_cfg_path = os.path.normpath(
+    os.path.join(
+        os.path.dirname(__file__),
+        '..',
+        '..',  # up from src/models to project root
+        'models',
+        'pi_net',
+        'config.yaml',
+    )
+)
+if not os.path.isfile(_cfg_path):
+    raise FileNotFoundError(f'PI‑Net config not found at {_cfg_path}')
+
+with open(_cfg_path) as f:
+    _cfg_dict = yaml.load(f, Loader=yaml.FullLoader)
+
+_full_cfg = OmegaConf.create(_cfg_dict)
+# patch any defaults you need
+_full_cfg.problem.deq.jacobian_factor = 1.0
+
+# define exactly what latent_forward expects
+default_config = {'threshold': _full_cfg.problem.deq.get('threshold', 'default')}
 
 
 class BasicBlock(nn.Module):
@@ -386,7 +416,7 @@ class PINet(DEQNet, BaseNet):
         latents = self.projection(inputs)
         return latents
 
-    def latent_forward(self, latents, inputs, iters=1, grad=False):
+    def latent_forward(self, latents, inputs, iters=1):
         if default_config['threshold'] == 'default':
             threshold = self.f_thres
         elif default_config['threshold'] == 'max_iter':
@@ -444,15 +474,23 @@ class PINet(DEQNet, BaseNet):
             else:
                 predictions = unmasked_predictions
             return predictions
+        # elif outputs.dim() == 5:
+        #     unmasked_predictions = torch.argmax(outputs, dim=2)
+        #     if masked:
+        #         mask, _ = torch.max(inputs, dim=1)
+        #         mask = mask.unsqueeze(0)
+        #         predictions = unmasked_predictions * mask
+        #     else:
+        #         predictions = unmasked_predictions
+        #     return predictions
         elif outputs.dim() == 5:
-            unmasked_predictions = torch.argmax(outputs, dim=2)
+            # outputs: [T, B, C, H, W] → argmax → [T, B, H, W]
+            preds = torch.argmax(outputs, dim=2)
             if masked:
-                mask, _ = torch.max(inputs, dim=1)
-                mask = mask.unsqueeze(0)
-                predictions = unmasked_predictions * mask
-            else:
-                predictions = unmasked_predictions
-            return predictions
+                mask = torch.max(inputs, dim=1)[0].unsqueeze(0)  # [1, B, H, W]
+                preds = preds * mask
+            # return list of [B, H, W] tensors, one per iteration
+            return list(preds.unbind(0))
 
     def train_step(
         self,
