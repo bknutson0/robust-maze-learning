@@ -164,3 +164,48 @@ def get_model_hyperparameters(model_name: str) -> Hyperparameters:
     filtered = {k: v for k, v in hyperparams.items() if k in valid_keys}
 
     return Hyperparameters(**filtered)
+
+
+def summarize_models() -> None:
+    """Print one row per model type: parameters (M) and size (MB)."""
+    base_dir = 'models'
+    headers = ['Model', 'Params (M)', 'Size (MB)']
+    rows = []
+
+    for model_type in os.listdir(base_dir):
+        type_dir = os.path.join(base_dir, model_type)
+        if not os.path.isdir(type_dir):
+            continue
+
+        # find the first checkpoint (.pth) in this model_type directory
+        pth_path = None
+        for root, _, files in os.walk(type_dir):
+            for fname in files:
+                if fname.endswith('.pth'):
+                    pth_path = os.path.join(root, fname)
+                    break
+            if pth_path:
+                break
+        if not pth_path:
+            continue
+
+        # load model to CPU
+        model = load_model(pretrained=pth_path).cpu()
+
+        # compute parameter count and size
+        total_params = sum(p.numel() for p in model.parameters())
+        params_m = total_params / 1e6
+        total_bytes = sum(p.numel() * p.element_size() for p in model.parameters())
+        size_mb = total_bytes / (1024**2)
+
+        rows.append([model_type, f'{params_m:.2f}', f'{size_mb:.2f}'])
+
+    # determine column widths
+    col_widths = [max(len(header), *(len(str(row[i])) for row in rows)) for i, header in enumerate(headers)]
+    fmt = '  '.join(f'{{:<{w}}}' for w in col_widths)
+
+    # print table
+    print(fmt.format(*headers))
+    print('-' * (sum(col_widths) + 2 * (len(headers) - 1)))
+    for row in rows:
+        print(fmt.format(*row))
