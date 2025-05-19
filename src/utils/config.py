@@ -4,8 +4,10 @@ import os
 from dataclasses import asdict, dataclass, field
 from typing import Any
 
+import numpy as np
 import torch
 from matplotlib import pyplot as plt
+from numpy.typing import DTypeLike
 
 # Device configuration
 # Prioritize PREFERRED_CUDA > CUDA > MPS > CPU
@@ -139,6 +141,17 @@ class TestParameters:
         os.makedirs(os.path.dirname(path), exist_ok=True)
         with open(path, 'w') as f:
             json.dump(asdict(self), f, indent=4)
+
+
+# TDA parameters, inherits from TestParameters
+@dataclass
+class TDAParameters(TestParameters):
+    """Parameters for running TDA."""
+
+    dtype: DTypeLike = np.float32
+    embed_dim: int = 0
+    delay: int = 1
+    max_homo: int = 1
 
 
 # Analysis plotting configuration

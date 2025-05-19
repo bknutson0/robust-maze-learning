@@ -1,18 +1,32 @@
 # ruff: noqa: N803, N806
 """Based on https://arxiv.org/abs/1704.08382."""
 
-import pickle
+import datetime
+import logging
+import os
 import time
+from itertools import product
 
 import numpy as np
+import pandas as pd
 import torch
 from numpy.typing import DTypeLike
+from pandas import DataFrame
 from ripser import ripser
 from scipy.spatial.distance import pdist, squareform
 
-from src.utils.config import DEVICE
+from src.models.base_net import BaseNet
+from src.utils.config import DEVICE, LOGGING_LEVEL, TDAParameters
+from src.utils.maze_loading import load_mazes
 from src.utils.model_loading import load_model
-from src.utils.testing import compare_mazes
+from src.utils.testing import is_minimal_path, is_valid_path
+
+# Create logger
+logging.basicConfig(
+    level=getattr(logging, LOGGING_LEVEL, logging.INFO),  # Default to INFO if LOGGING_LEVEL is invalid
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+)
+logger = logging.getLogger(__name__)
 
 
 def get_diagram(
@@ -21,36 +35,31 @@ def get_diagram(
     embed_dim: int = 0,
     delay: int = 1,
     max_homo: int = 1,
-    verbose: bool = True,
 ) -> tuple[list[np.ndarray], float]:  # type: ignore
     """Get the persistence diagram for data X."""
-    # Convert from torch tensor to numpy array if necessary
+    # Convert from torch tensor to cpu numpy array
     if isinstance(X, torch.Tensor):
         X = X.cpu().numpy()  # type: ignore
 
     # Ensure desired precision
     X = X.astype(dtype)  # type: ignore
 
-    if verbose:
-        print(f'    Performing TDA with {embed_dim = }, {delay = }, and {X.shape = } ({X.nbytes / 1e9:.3f}GB)')
+    logger.info(f'Performing TDA with {embed_dim = }, {delay = }, and {X.shape = } ({X.nbytes / 1e9:.3f}GB)')
 
     # Flatten dimensions beyond first
     X = X.reshape(X.shape[0], -1)
-    if verbose:
-        print(f'    Flattened {X.shape = }')
+    logger.info(f'Flattened {X.shape = }')
 
     # Reduce dimensionality of X using SVD, if first dimension is smaller
     F, P = X.shape
     if F < P:
         X = reduce(X)  # type: ignore
-        if verbose:
-            print(f'    Reduced {X.shape = } ({X.nbytes / 1e9:.3f}GB)')
+        logger.info(f'Reduced {X.shape = } ({X.nbytes / 1e9:.3f}GB)')
 
-    # Compute distance matriX of sliding window embedding of X
+    # Compute distance matrix of sliding window embedding of X
     distance_matrix = get_distance_matrix(X)  # type: ignore
     max_distance = np.max(distance_matrix)
-    if verbose:
-        print(f'    Computed {distance_matrix.shape = } with {max_distance = :.3f}')
+    logger.info(f'Computed {distance_matrix.shape = } with {max_distance = :.3f}')
 
     # Use ripser to compute persistence diagram
     diagram = ripser(distance_matrix, maxdim=max_homo, coeff=2, distance_matrix=True)['dgms']
@@ -160,147 +169,93 @@ def get_max_death(diagram: list[np.ndarray]) -> float:  # type: ignore
     return max_death
 
 
-class Analysis:
-    """Class for TDA analysis and results."""
+@torch.no_grad()
+def specific_tda(params: TDAParameters) -> DataFrame:
+    """Run TDA for one combination of parameters and return a DataFrame of results."""
+    # Validate that all fields except 'iters' and 'model_name' are scalars
+    for key, val in vars(params).items():
+        if key not in ('iters', 'model_name') and isinstance(val, list):
+            raise ValueError(f'Invalid type for {key}: expected scalar, got list')
 
-    def __init__(
-        self,
-        maze_sizes: list[int] = [9],
-        percolations: list[float] = [0.0],
-        num_mazes: int = 100,
-        model_name: str = 'dt_net',
-        iters: list[int] = list(range(3001, 3401)),
-        dtype: DTypeLike = np.float64,
-        embed_dim: int = 0,
-        delay: int = 1,
-        max_homo: int = 1,
-        verbose: bool = True,
-    ) -> None:
-        """Initialize analysis object."""
-        self.maze_sizes = maze_sizes
-        self.percolations = percolations
-        self.verbose = verbose
-        self.extrap_param_name, self.extrap_param = self.get_extrap_param()
-        self.num_mazes = num_mazes
-        self.model = load_model(model_name)
-        self.iters = iters
-        self.dtype = dtype
-        self.embed_dim = embed_dim
-        self.delay = delay
-        self.max_homo = max_homo
-        self.corrects = np.zeros((len(self.extrap_param), self.num_mazes))
-        self.times = np.zeros((len(self.extrap_param), num_mazes), dtype=np.float32)
-        self.diagrams = np.zeros((len(self.extrap_param), num_mazes, 2), dtype=object)
-        self.max_distances = np.zeros((len(self.extrap_param), num_mazes), dtype=dtype)
+    # Load mazes
+    inputs, solutions = load_mazes(params)
 
-    def get_extrap_param(self) -> tuple[str, list]:
-        """Get extrapolation paramter name and values."""
-        if len(self.maze_sizes) > 1 and len(self.percolations) == 1:
-            self.percolation = self.percolations[0]
-            if self.verbose:
-                print(f'Performing TDA over maze sizes: {self.maze_sizes}')
-            return 'maze_size', self.maze_sizes
-        elif len(self.percolations) > 1 and len(self.maze_sizes) == 1:
-            self.maze_size = self.maze_sizes[0]
-            if self.verbose:
-                print(f'Performing TDA over percolations: {self.percolations}')
-            return 'percolation', self.percolations
-        else:
-            raise ValueError(
-                'Invalid parameters: Either maze_sizes or percolations should have multiple values, but not both.'
-            )
+    # Load and prepare model
+    model = load_model(params.model_name)  # type: ignore
+    if not isinstance(model, BaseNet):
+        raise ValueError(f'Invalid model type: {type(model)}. Need BaseNet or subclass for TDA.')
+    model.eval()
 
-    def get_name(self) -> str:
-        """Get name of analysis object."""
-        name = f'{self.model.name()}'
-        for attr, value in self.__dict__.items():
-            if attr == 'iters':
-                name += f'_{attr}-{min(value)},{max(value)}'
-            elif attr == 'dtype':
-                name += f'_dtype-{self.max_distances.dtype.name}'
-            elif attr not in [
-                'model',
-                'corrects',
-                'times',
-                'diagrams',
-                'max_distances',
-                'extrap_param_name',
-                'extrap_param',
-                'verbose',
-            ]:
-                name += f'_{attr}-{value}'
-        return name
+    rows = []
+    for j, (input, solution) in enumerate(zip(inputs, solutions, strict=False)):
+        start = time.time()
 
-    def save(self):
-        """Save analysis object"""
-        file_name = f'outputs/tda/analysis/{self.get_name()}.pkl'
-        with open(file_name, 'wb') as f:
-            pickle.dump(self, f)
+        # forward pass to get latent series
+        latent = model.input_to_latent(input.unsqueeze(0))
+        latent_series = model.latent_forward(latent, input.unsqueeze(0), params.iters)
+        output = model.latent_to_output(latent_series[0])
+        prediction = model.output_to_prediction(output, input)
+        torch.cuda.empty_cache()
 
-    def analyze(self) -> None:
-        """Perform TDA analysis on latent iterates of model while solving mazes."""
-        for i, param in enumerate(self.extrap_param):
-            # Print summary
-            if self.verbose:
-                print(
-                    f'Analyzing {self.model.name()} on {self.num_mazes} mazes '
-                    f'with {self.extrap_param_name} = {param} ...'
-                )
+        # compute persistence diagram
+        diag, max_dist = get_diagram(latent_series, params.dtype, params.embed_dim, params.delay, params.max_homo)  # type: ignore
 
-            # Load mazes
-            start_time = time.time()
-            if self.extrap_param_name == 'maze_size':
-                inputs, solutions = get_mazes(maze_size=param, num_mazes=self.num_mazes)
-            elif self.extrap_param_name == 'percolation':
-                inputs, solutions = get_mazes(percolation=param, num_mazes=self.num_mazes)
+        # record one row
+        rows.append(
+            {
+                'model_name': params.model_name,
+                'maze_size': params.maze_size,
+                'percolation': params.percolation,
+                'maze_index': j,
+                'max_distance': max_dist,
+                'h0': diag[0],
+                'h1': diag[1],
+                'time_s': time.time() - start,
+                'matches_solution': prediction == solution,
+                'is_valid': is_valid_path(input, prediction),
+                'is_minimal': is_minimal_path(input, prediction, solution),
+            }
+        )
 
-            if self.verbose:
-                print(f'    Loaded mazes in {time.time() - start_time:.2f}s')
+    return pd.DataFrame(rows)
 
-            # Generate each latent series and perform TDA
-            for j in range(self.num_mazes):
-                # Generate latent series
-                start_time = time.time()
-                input = inputs[j : j + 1]
-                latent = self.model.input_to_latent(input)
-                latent_series = self.model.latent_forward(latent, input, self.iters)
-                output = self.model.latent_to_output(latent_series[0])
-                latent_series = latent_series.cpu().numpy()
-                torch.cuda.empty_cache()
 
-                # Evaluate correctness
-                prediction = self.model.output_to_prediction(output, input)
-                solution = solutions[j : j + 1]
-                self.corrects[i, j] = compare_mazes(prediction, solution)[0]
+def tda(params: TDAParameters) -> DataFrame:
+    """Run TDA over all combinations of list-valued parameters, saving and returning results."""
+    # prepare output directory
+    os.makedirs('outputs/tda', exist_ok=True)
+    timestamp = datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
+    run_dir = os.path.join('outputs/tda', timestamp)
+    os.makedirs(run_dir, exist_ok=True)
 
-                # Perform TDA
-                diagram, max_distance = get_diagram(
-                    latent_series.squeeze(), self.dtype, self.embed_dim, self.delay, self.max_homo, verbose=False
-                )
-                self.diagrams[i, j, 0] = diagram[0]
-                self.diagrams[i, j, 1] = diagram[1]
-                self.max_distances[i, j] = max_distance
+    # save parameters
+    params.to_json(os.path.join(run_dir, 'tda_parameters.json'))
 
-                # Save results
-                self.save()
+    # build list of specific parameter objects
+    param_dict = {k: (v if isinstance(v, list) else [v]) for k, v in vars(params).items()}
+    for drop in ('iters', 'model_name'):
+        param_dict.pop(drop, None)
 
-                self.times[i, j] = time.time() - start_time
-                if self.verbose:
-                    print(
-                        f'    Analyzed latent series for {"correct" if self.corrects[i, j] else "incorrect"} maze {j + 1} of {self.num_mazes} in {self.times[i, j]:.2f}s'
-                    )
+    specific_list = []
+    for combo in product(*param_dict.values()):
+        p = TDAParameters()
+        p.model_name = params.model_name
+        p.iters = sorted(params.iters) if isinstance(params.iters, list) else [params.iters]
+        for key, val in zip(param_dict.keys(), combo, strict=False):
+            setattr(p, key, val)
+        p.num_mazes = params.num_mazes
+        p.dtype = params.dtype
+        p.embed_dim = params.embed_dim
+        p.delay = params.delay
+        p.max_homo = params.max_homo
+        specific_list.append(p)
 
-        if self.verbose:
-            print(f'Analysis complete after {np.sum(self.times):.2f}s')
+    # run and save
+    results = pd.DataFrame()
+    results_file = os.path.join(run_dir, 'results.csv')
+    for spec in specific_list:
+        df = specific_tda(spec)
+        results = pd.concat([results, df], ignore_index=True)
+        results.to_csv(results_file, index=False)
 
-    def get_betti_nums(self, threshold: float) -> np.ndarray:
-        """Get Betti numbers for diagrams with given threshold."""
-        betti_nums = np.zeros((len(self.extrap_param), self.num_mazes, self.max_homo + 1), dtype=int)
-        for i in range(len(self.extrap_param)):
-            for j in range(self.num_mazes):
-                betti_nums[i, j] = get_betti_nums(self.diagrams[i, j], threshold)
-        return betti_nums
-
-    def print_time(self) -> None:
-        """Print time for analysis."""
-        print(f'Time for analysis: {np.sum(self.times) / 60:.2f}min')
+    return results
