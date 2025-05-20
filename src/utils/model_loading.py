@@ -87,8 +87,6 @@ def load_model(model_name: str | None = None, pretrained: str | None = None, wei
         model = ITNet()
     elif 'ff_net' in model_name:
         model = FFNet()
-    elif 'pi_net' in model_name:
-        model = PINet()
     elif 'deadend_fill' in model_name:
         model = DeadendFill()
         return model

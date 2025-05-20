@@ -416,43 +416,51 @@ class PINet(DEQNet, BaseNet):
         latents = self.projection(inputs)
         return latents
 
-    def latent_forward(self, latents, inputs, iters=1):
+    def latent_forward(
+        self,
+        latents: torch.Tensor | None,
+        inputs: torch.Tensor,
+        iters: int | list[int] = 1,
+        threshold: float | None = None,
+    ) -> torch.Tensor | list[torch.Tensor]:
+        """Perform fixed-point iterations and return latent(s) at the requested iterations."""
+        # ————— decide solver threshold —————
         if default_config['threshold'] == 'default':
             threshold = self.f_thres
         elif default_config['threshold'] == 'max_iter':
-            threshold = max(iters)
-        elif type(default_config['threshold']) == int:
+            threshold = max(iters) if isinstance(iters, (list, tuple)) else iters
+        elif isinstance(default_config['threshold'], int):
             threshold = default_config['threshold']
 
-        if type(iters) == int:
-            self.layer_idx = [iters]
-            latents = self.projection(inputs) if latents is None else latents
-            func = lambda latents: self.deq(latents, inputs)
-            result = self.f_solver(
-                func,
-                latents,
-                threshold=threshold,
-                stop_mode=self.stop_mode,
-                layer_idx=self.layer_idx,
-                name='forward',
-            )
-            latents = result['result']
-            return latents
+        # ————— normalize iters to a sorted list —————
+        iters_list = [iters] if isinstance(iters, int) else sorted(iters)
+        self.layer_idx = iters_list
 
-        elif type(iters) == list:
-            self.layer_idx = iters
-            latents = self.projection(inputs) if latents is None else latents
-            func = lambda latents: self.deq(latents, inputs)
-            result = self.f_solver(
-                func,
-                latents,
-                threshold=threshold,
-                stop_mode=self.stop_mode,
-                layer_idx=self.layer_idx,
-                name='forward',
-            )
-            latents_series = torch.stack(result['interm_vals'], dim=0)
-            return latents_series
+        # ————— initialize if needed —————
+        latents = self.projection(inputs) if latents is None else latents
+
+        # ————— run DEQ solver —————
+        func = lambda z: self.deq(z, inputs)
+        result = self.f_solver(
+            func,
+            latents,
+            threshold=threshold,
+            stop_mode=self.stop_mode,
+            layer_idx=iters_list,
+            name='forward',
+        )
+
+        # ————— collect intermediate latents —————
+        latents_list: list[torch.Tensor] = result.get('interm_vals', [])
+        # if solver didn’t return intermediates, fall back to final
+        if not latents_list:
+            final = result['result']
+            return final if len(iters_list) == 1 else [final] * len(iters_list)
+
+        # ————— return exactly one Tensor for single‐iter, else list —————
+        if len(latents_list) == 1:
+            return latents_list[0]
+        return latents_list
 
     def latent_to_output(self, latents):
         if latents.dim() == 4:

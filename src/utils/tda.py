@@ -176,60 +176,60 @@ def get_max_death(diagram: list[np.ndarray]) -> float:  # type: ignore
 
 @torch.no_grad()
 def specific_tda(params: TDAParameters) -> DataFrame:
-    """Run TDA for one combination of parameters and return a DataFrame of results."""
-    # Validate that all fields except 'iters' and 'model_name' are scalars
+    """Run TDA for one combination of maze parameters across multiple models."""
+    # Validate that all fields except 'iters' and 'model_name' are scalars or list for model_name
     for key, val in vars(params).items():
         if key not in ('iters', 'model_name') and isinstance(val, list):
             raise ValueError(f'Invalid type for {key}: expected scalar, got list')
 
-    # Load mazes
+    # Load all mazes once
     inputs, solutions = load_mazes(params)
-
-    # Load and prepare model
-    model = load_model(params.model_name)  # type: ignore
-    if not isinstance(model, BaseNet):
-        raise ValueError(f'Invalid model type: {type(model)}. Need BaseNet or subclass for TDA.')
-    model.eval()
+    # inputs: (num_mazes, C, H, W), solutions: same shape
 
     rows = []
-    for j, (input, solution) in enumerate(zip(inputs, solutions, strict=False)):
-        start = time.time()
+    # Iterate over each model in the list
+    for model_name in params.model_name:
+        model = load_model(pretrained=model_name)
+        if not isinstance(model, BaseNet):
+            raise ValueError(f'Invalid model type: {type(model)}. Need BaseNet or subclass for TDA.')
+        model.eval()
 
-        # forward pass to get latent series
-        latent = model.input_to_latent(input.unsqueeze(0))
-        print(f'{latent.shape = }')
-        latent_series = model.latent_forward(latent, input.unsqueeze(0), params.iters)
-        print(f'{len(latent_series) = }, {latent_series[0].shape = }')
-        output = model.latent_to_output(latent_series[0])
-        print(f'{output.shape = }')
-        prediction = model.output_to_prediction(output, input)
-        torch.cuda.empty_cache()
+        # Run every maze through this model
+        for j in range(params.num_mazes):
+            inp = inputs[j : j + 1]
+            sol = solutions[j : j + 1]
+            start = time.time()
 
-        # compute persistence diagram
-        diag, max_dist = get_diagram(
-            latent_series=latent_series,
-            dtype=params.dtype,
-            embed_dim=params.embed_dim,
-            delay=params.delay,
-            max_homo=params.max_homo,
-        )
+            # get latent series
+            latent = model.input_to_latent(inp)
+            latent_series = model.latent_forward(latent, inp, params.iters, params.tolerance)
+            torch.cuda.empty_cache()
 
-        # record one row
-        rows.append(
-            {
-                'model_name': params.model_name,
-                'maze_size': params.maze_size,
-                'percolation': params.percolation,
-                'maze_index': j,
-                'max_distance': max_dist,
-                'h0': diag[0],
-                'h1': diag[1],
-                'time_s': time.time() - start,
-                'matches_solution': prediction == solution,
-                'is_valid': is_valid_path(input, prediction),
-                'is_minimal': is_minimal_path(input, prediction, solution),
-            }
-        )
+            # compute TDA
+            diag, max_dist = get_diagram(
+                latent_series,  # type: ignore
+                dtype=params.dtype,
+                embed_dim=params.embed_dim,
+                delay=params.delay,
+                max_homo=params.max_homo,
+            )
+
+            # record results
+            pred = model.output_to_prediction(model.latent_to_output(latent_series[0]), inp)
+            rows.append(
+                {
+                    'model_name': model_name,
+                    'maze_size': int(params.maze_size),
+                    'percolation': float(params.percolation),
+                    'maze_index': int(j),
+                    'max_distance': float(max_dist),
+                    'diagram': diag,
+                    'time_s': float(time.time() - start),
+                    'matches_solution': bool((pred == sol).all().item()),
+                    'is_valid': bool(is_valid_path(inp, pred).item()),
+                    'is_minimal': bool(is_minimal_path(inp, pred, sol).item()),
+                }
+            )
 
     return pd.DataFrame(rows)
 
