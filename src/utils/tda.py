@@ -5,6 +5,7 @@ import datetime
 import logging
 import os
 import time
+from collections import Counter
 from itertools import product
 
 import numpy as np
@@ -18,7 +19,7 @@ from scipy.spatial.distance import pdist, squareform
 from src.models.base_net import BaseNet
 from src.utils.config import DEVICE, LOGGING_LEVEL, TDAParameters
 from src.utils.maze_loading import load_mazes
-from src.utils.model_loading import load_model
+from src.utils.model_loading import get_model_hyperparameters, load_model
 from src.utils.seeding import set_seed
 from src.utils.testing import is_minimal_path, is_valid_path
 
@@ -184,43 +185,50 @@ def specific_tda(params: TDAParameters) -> DataFrame:
 
     # Load all mazes once
     inputs, solutions = load_mazes(params)
-    # inputs: (num_mazes, C, H, W), solutions: same shape
 
     rows = []
-    # Iterate over each model in the list
     for model_name in params.model_name:
         model = load_model(pretrained=model_name)
         if not isinstance(model, BaseNet):
             raise ValueError(f'Invalid model type: {type(model)}. Need BaseNet or subclass for TDA.')
         model.eval()
 
-        # Run every maze through this model
+        train_hp = get_model_hyperparameters(model_name)
+
+        # Process each maze individually
         for j in range(params.num_mazes):
             inp = inputs[j : j + 1]
             sol = solutions[j : j + 1]
             start = time.time()
 
-            # get latent series
-            latent = model.input_to_latent(inp)
-            latent_series = model.latent_forward(latent, inp, params.iters, params.tolerance)
+            # forward to get latent series
+            lat0 = model.input_to_latent(inp)
+            lat_series = model.latent_forward(lat0, inp, params.iters, params.tolerance)
             torch.cuda.empty_cache()
 
-            # compute TDA
+            # compute persistence diagram
             diag, max_dist = get_diagram(
-                latent_series,  # type: ignore
+                lat_series,  # type: ignore
                 dtype=params.dtype,
                 embed_dim=params.embed_dim,
                 delay=params.delay,
                 max_homo=params.max_homo,
             )
 
-            # record results
-            pred = model.output_to_prediction(model.latent_to_output(latent_series[0]), inp)
+            # prediction & metrics
+            out = model.latent_to_output(lat_series if isinstance(lat_series, torch.Tensor) else lat_series[0])
+            pred = model.output_to_prediction(out, inp)
+
             rows.append(
                 {
+                    # model info
                     'model_name': model_name,
-                    'maze_size': int(params.maze_size),
-                    'percolation': float(params.percolation),
+                    # training hyperparameters
+                    'train_percolation': float(train_hp.percolation),
+                    # TDA/test parameters
+                    'test_maze_size': int(params.maze_size),  # type: ignore
+                    'test_percolation': float(params.percolation),  # type: ignore
+                    # per‐maze results
                     'maze_index': int(j),
                     'max_distance': float(max_dist),
                     'diagram': diag,
@@ -274,5 +282,42 @@ def tda(params: TDAParameters) -> DataFrame:
         df = specific_tda(spec)
         results = pd.concat([results, df], ignore_index=True)
         results.to_csv(results_file, index=False)
+    logger.info(f'TDA results saved to {results_file}')
 
     return results
+
+
+def add_betti_column(df: DataFrame, threshold: float) -> DataFrame:
+    """Add Betti numbers to the DataFrame based on persistence threshold."""
+    betti_list = []
+    for diag in df['diagram']:
+        betti = get_betti_nums(diag, threshold)
+        betti_list.append((int(betti[0]), int(betti[1])))
+    df2 = df.copy()
+    df2['betti_nums'] = betti_list
+    return df2
+
+
+def make_betti_table(df: DataFrame) -> DataFrame:
+    """Create a summary table of Betti number distributions."""
+    models = sorted(df['model_name'].unique())
+    sizes = sorted(df['test_maze_size'].unique())
+    table = pd.DataFrame(index=models, columns=sizes, dtype=object)
+
+    for m in models:
+        for s in sizes:
+            sub = df[(df['model_name'] == m) & (df['test_maze_size'] == s)]
+            counts = Counter(sub['betti_nums'])
+            total = sum(counts.values())
+            most_common = counts.most_common(3)
+
+            # format entries with HTML <br>
+            entries = [f'[{b0},{b1}]-{cnt}' for (b0, b1), cnt in most_common]
+            rest = total - sum(cnt for _, cnt in most_common)
+            entries.append(f'Other-{rest}')
+
+            table.at[m, s] = '<br>'.join(entries)
+
+    table.index.name = 'model_name'
+    table.columns.name = 'test_maze_size'
+    return table

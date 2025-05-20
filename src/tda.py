@@ -7,19 +7,18 @@ def main() -> None:
     # Select TDA parameters
     params = TDAParameters()
     params.model_name = [
-        'dt_net/original.pth',
-        'models/dt_net/2025-04-17_13:30:06/best.pth',  # dt_net trained on percolation 0.0
-        'pi_net/original.pth',
-        'models/it_net/2025-03-27_16:16:36/best.pth',  # it_net trained on percolation 0.0
+        'models/dt_net/original.pth',
+        'models/dt_net/2025-04-17_13:30:06/best.pth',  # trained on percolation 0.0
+        'models/pi_net/original.pth',
+        'models/it_net/2025-03-27_16:16:36/best.pth',  # trained on percolation 0.0
     ]
-    params.num_mazes = 3
-    params.percolation = [0]
+    params.num_mazes = 100
+    params.maze_size = [9, 19, 29, 39, 49, 59, 69]
+    params.iters = list(range(3001, 3401))
+    params.percolation = [0.0]
 
     # Perform TDA
-    df = tda(params=params)
-
-    # Analyze TDA results
-    print(df.head(10))
+    tda(params=params)
 
 
 if __name__ == '__main__':

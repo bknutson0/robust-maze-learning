@@ -153,7 +153,6 @@ class TDAParameters(TestParameters):
     embed_dim: int = 0
     delay: int = 1
     max_homo: int = 1
-    betti_threshold: float = 0.4
 
 
 # Analysis plotting configuration
