@@ -19,6 +19,7 @@ from src.models.base_net import BaseNet
 from src.utils.config import DEVICE, LOGGING_LEVEL, TDAParameters
 from src.utils.maze_loading import load_mazes
 from src.utils.model_loading import load_model
+from src.utils.seeding import set_seed
 from src.utils.testing import is_minimal_path, is_valid_path
 
 # Create logger
@@ -30,13 +31,17 @@ logger = logging.getLogger(__name__)
 
 
 def get_diagram(
-    X: torch.Tensor,
+    latent_series: list[torch.Tensor],
     dtype: DTypeLike = np.float32,
     embed_dim: int = 0,
     delay: int = 1,
     max_homo: int = 1,
 ) -> tuple[list[np.ndarray], float]:  # type: ignore
     """Get the persistence diagram for data X."""
+    # Flatten list of tensors into tensor
+
+    X = torch.cat(latent_series, dim=0)
+
     # Convert from torch tensor to cpu numpy array
     if isinstance(X, torch.Tensor):
         X = X.cpu().numpy()  # type: ignore
@@ -192,13 +197,22 @@ def specific_tda(params: TDAParameters) -> DataFrame:
 
         # forward pass to get latent series
         latent = model.input_to_latent(input.unsqueeze(0))
+        print(f'{latent.shape = }')
         latent_series = model.latent_forward(latent, input.unsqueeze(0), params.iters)
+        print(f'{len(latent_series) = }, {latent_series[0].shape = }')
         output = model.latent_to_output(latent_series[0])
+        print(f'{output.shape = }')
         prediction = model.output_to_prediction(output, input)
         torch.cuda.empty_cache()
 
         # compute persistence diagram
-        diag, max_dist = get_diagram(latent_series, params.dtype, params.embed_dim, params.delay, params.max_homo)  # type: ignore
+        diag, max_dist = get_diagram(
+            latent_series=latent_series,
+            dtype=params.dtype,
+            embed_dim=params.embed_dim,
+            delay=params.delay,
+            max_homo=params.max_homo,
+        )
 
         # record one row
         rows.append(
@@ -222,6 +236,9 @@ def specific_tda(params: TDAParameters) -> DataFrame:
 
 def tda(params: TDAParameters) -> DataFrame:
     """Run TDA over all combinations of list-valued parameters, saving and returning results."""
+    # Set seed
+    set_seed(params.seed)
+
     # prepare output directory
     os.makedirs('outputs/tda', exist_ok=True)
     timestamp = datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S')

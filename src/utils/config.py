@@ -111,7 +111,7 @@ class TestParameters:
     percolation: list[float] | float = field(
         default_factory=lambda: [0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 0.99]
     )
-    num_mazes: list[int] | int = field(default_factory=lambda: [10000])
+    num_mazes: int = 10000
 
     # Model hyperparameters
     model_name: list[str] | str = field(default_factory=lambda: ['dt_net'])
@@ -140,7 +140,7 @@ class TestParameters:
         """Save test parameters to JSON file."""
         os.makedirs(os.path.dirname(path), exist_ok=True)
         with open(path, 'w') as f:
-            json.dump(asdict(self), f, indent=4)
+            json.dump(asdict(self), f, indent=4, default=str)
 
 
 # TDA parameters, inherits from TestParameters
@@ -148,6 +148,7 @@ class TestParameters:
 class TDAParameters(TestParameters):
     """Parameters for running TDA."""
 
+    iters: list[int] = field(default_factory=lambda: list(range(3001, 3401)))
     dtype: DTypeLike = np.float32
     embed_dim: int = 0
     delay: int = 1

@@ -52,6 +52,9 @@ class BaseNet(torch.nn.Module, Model):
                 unmasked_predictions = torch.argmax(outputs, dim=1)
                 if masked:
                     mask, _ = torch.max(inputs, dim=1)
+                    print(f'{unmasked_predictions.shape=}')
+                    print(f'{mask.shape=}')
+
                     predictions = unmasked_predictions * mask
                 else:
                     predictions = unmasked_predictions
