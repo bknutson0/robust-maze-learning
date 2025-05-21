@@ -7,11 +7,16 @@ import os
 import time
 from collections import Counter
 from itertools import product
+from pathlib import Path
+from typing import Any
 
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import torch
-from numpy.typing import DTypeLike
+from matplotlib import cm
+from matplotlib.figure import Figure
+from numpy.typing import DTypeLike, NDArray
 from pandas import DataFrame
 from ripser import ripser
 from scipy.spatial.distance import pdist, squareform
@@ -68,7 +73,9 @@ def get_diagram(
     logger.info(f'Computed {distance_matrix.shape = } with {max_distance = :.3f}')
 
     # Use ripser to compute persistence diagram
+    print(f'{max_homo = }')
     diagram = ripser(distance_matrix, maxdim=max_homo, coeff=2, distance_matrix=True)['dgms']
+    print(f'{diagram[1] = }')
 
     return diagram, max_distance
 
@@ -151,11 +158,10 @@ def get_betti_nums(diagram: list[np.ndarray], threshold: float) -> np.ndarray:  
     # If diagram corresponds to single point, return [1, 0]
     if (diagram[0] == [[0, np.inf]]).all() and (diagram[1] == np.zeros((0, 2))).all():
         betti_nums[0] = 1
-        betti_nums[1] = 0
 
     # Otherwise, calculate persistent homologies above threshold
     else:
-        max_death = get_max_death(diagram)
+        max_death = get_max_finite_death(diagram)
         for i in range(len(diagram)):
             for j in range(len(diagram[i])):
                 lifetime = diagram[i][j, 1] - diagram[i][j, 0]
@@ -165,14 +171,15 @@ def get_betti_nums(diagram: list[np.ndarray], threshold: float) -> np.ndarray:  
     return betti_nums
 
 
-def get_max_death(diagram: list[np.ndarray]) -> float:  # type: ignore
+def get_max_finite_death(diagram: list[np.ndarray]) -> float | None:  # type: ignore
     """Get maximum death in D, ignoring infinity."""
-    max_death = 0
-    for i in range(len(diagram)):
-        for j in range(len(diagram[i])):
-            if diagram[i][j, 1] != np.inf:
-                max_death = max(max_death, diagram[i][j, 1])
-    return max_death
+    finite_deaths = []
+    for d in diagram:
+        finite_deaths.extend(d[np.isfinite(d[:, 1]), 1])
+
+    max_finite_death = np.max(finite_deaths) if finite_deaths else None
+
+    return max_finite_death
 
 
 @torch.no_grad()
@@ -230,9 +237,11 @@ def specific_tda(params: TDAParameters) -> DataFrame:
                     'test_percolation': float(params.percolation),  # type: ignore
                     # per‐maze results
                     'maze_index': int(j),
+                    'embed_dim': int(params.embed_dim),
+                    'delay': int(params.delay),
                     'max_distance': float(max_dist),
                     'diagram': diag,
-                    'time_s': float(time.time() - start),
+                    'time': float(time.time() - start),
                     'matches_solution': bool((pred == sol).all().item()),
                     'is_valid': bool(is_valid_path(inp, pred).item()),
                     'is_minimal': bool(is_minimal_path(inp, pred, sol).item()),
@@ -277,12 +286,13 @@ def tda(params: TDAParameters) -> DataFrame:
 
     # run and save
     results = pd.DataFrame()
-    results_file = os.path.join(run_dir, 'results.csv')
+    results_file = os.path.join(run_dir, 'results.pkl')
     for spec in specific_list:
         df = specific_tda(spec)
         results = pd.concat([results, df], ignore_index=True)
-        results.to_csv(results_file, index=False)
-    logger.info(f'TDA results saved to {results_file}')
+        results.to_pickle(os.path.join(run_dir, 'results.pkl'))
+        logger.info(f'Partial TDA results saved to {results_file}')
+    logger.info(f'Complete TDA results saved to {results_file}')
 
     return results
 
@@ -321,3 +331,167 @@ def make_betti_table(df: DataFrame) -> DataFrame:
     table.index.name = 'model_name'
     table.columns.name = 'test_maze_size'
     return table
+
+
+def sample_sphere(n: int = 1000, radius: float = 1.0, hollow: bool = False) -> NDArray[Any]:
+    """Sample points uniformly in (hollow=False) or on (hollow=True) a sphere."""
+    # for solid: radii ~ rand**(1/3); for hollow: radii = 1
+    u = np.random.rand(n) ** (1 / 3) if not hollow else np.ones(n)
+    dirs = np.random.normal(size=(n, 3))
+    dirs /= np.linalg.norm(dirs, axis=1)[:, None]
+    return dirs * u[:, None] * radius
+
+
+def sample_cube(n: int = 1000, half_side: float = 1.0, hollow: bool = False) -> NDArray[Any]:
+    """Sample points in (hollow=False) or on (hollow=True) the surface of a cube."""
+    if not hollow:
+        return np.random.uniform(-half_side, half_side, size=(n, 3))
+    # sample surface: pick one of 6 faces, then uniform on that square
+    faces = np.random.randint(0, 6, size=n)
+    uv = np.random.uniform(-half_side, half_side, size=(n, 2))
+    pts = np.zeros((n, 3))
+    for i, f in enumerate(faces):
+        if f == 0:
+            pts[i] = [-half_side, uv[i, 0], uv[i, 1]]
+        elif f == 1:
+            pts[i] = [half_side, uv[i, 0], uv[i, 1]]
+        elif f == 2:
+            pts[i] = [uv[i, 0], -half_side, uv[i, 1]]
+        elif f == 3:
+            pts[i] = [uv[i, 0], half_side, uv[i, 1]]
+        elif f == 4:
+            pts[i] = [uv[i, 0], uv[i, 1], -half_side]
+        else:
+            pts[i] = [uv[i, 0], uv[i, 1], half_side]
+    return pts
+
+
+def sample_circle(n: int = 1000, radius: float = 1.0, hollow: bool = True) -> NDArray[Any]:
+    """Sample points on (hollow=True) or in (hollow=False) a circle in the z=0 plane."""
+    θ = np.random.rand(n) * 2 * np.pi
+    r = np.full(n, radius) if hollow else np.sqrt(np.random.rand(n)) * radius
+    x, y = r * np.cos(θ), r * np.sin(θ)
+    return np.column_stack((x, y, np.zeros(n)))
+
+
+def sample_square(n: int = 1000, half_side: float = 1.0, hollow: bool = True) -> NDArray[Any]:
+    """Sample points on (hollow=True) or in (hollow=False) a square in the z=0 plane."""
+    if not hollow:
+        xy = np.random.uniform(-half_side, half_side, size=(n, 2))
+    else:
+        perim = 8 * half_side
+        s = np.random.rand(n) * perim
+        xy = np.empty((n, 2))
+        for i, si in enumerate(s):
+            seg = int(si // (2 * half_side))
+            t = si % (2 * half_side)
+            if seg == 0:
+                xy[i] = [-half_side + t, -half_side]
+            elif seg == 1:
+                xy[i] = [half_side, -half_side + t]
+            elif seg == 2:
+                xy[i] = [half_side - t, half_side]
+            else:
+                xy[i] = [-half_side, half_side - t]
+    return np.column_stack((xy, np.zeros(n)))
+
+
+def sample_torus(n: int = 1000, R: float = 2.0, r: float = 0.5, hollow: bool = False) -> NDArray[Any]:
+    """Sample points in (hollow=False) or on (hollow=True) a torus."""
+    u = np.random.rand(n) * 2 * np.pi
+    v = np.random.rand(n) * 2 * np.pi
+    if not hollow:
+        rad = np.sqrt(np.random.rand(n)) * r
+        cx, cy = R * np.cos(u), R * np.sin(u)
+        off_x = rad * np.cos(v) * np.cos(u)
+        off_y = rad * np.cos(v) * np.sin(u)
+        off_z = rad * np.sin(v)
+        return np.column_stack((cx + off_x, cy + off_y, off_z))
+    else:
+        x = (R + r * np.cos(v)) * np.cos(u)
+        y = (R + r * np.cos(v)) * np.sin(u)
+        z = r * np.sin(v)
+        return np.column_stack((x, y, z))
+
+
+def get_pca(X: NDArray[Any] | torch.Tensor, n: int = 2) -> NDArray[Any]:
+    """Project rows of data matrix X onto n principal components using SVD."""
+    # Move X to GPU
+    X = X.to(DEVICE) if isinstance(X, torch.Tensor) else torch.tensor(X, dtype=torch.float32, device=DEVICE)
+
+    # Flatten data
+    X = X.reshape(X.shape[0], -1)
+
+    # Convert to torch on device
+    X = torch.tensor(X, dtype=torch.float32, device=DEVICE)
+
+    with torch.no_grad():
+        # Center the data
+        X = X - torch.mean(X, dim=0)
+
+        # Compute the SVD
+        U, S, V = torch.linalg.svd(X, full_matrices=False)
+
+        # Project the data onto the first n principal components
+        Y = torch.mm(X, V[:n].T)
+
+    # Convert back to numpy
+    Y = Y.cpu().numpy()  # type: ignore
+
+    return Y  # type: ignore
+
+
+def plot_diagram(
+    diagram: list[NDArray[Any]],
+    threshold: float | None = None,
+    fig_size: tuple[float, float] = (5, 5),
+    font_size: int = 8,
+    file_path: str | None = None,
+) -> Figure:
+    """Plot a persistence diagram using given threshold."""
+    # filter out infinite deaths
+    filtered = [d[np.isfinite(d[:, 1])] for d in diagram]
+    if not filtered or all(d.size == 0 for d in filtered):
+        raise ValueError('No finite death values found in any diagram.')
+
+    max_death = get_max_finite_death(diagram)
+    margin = 1.05 * max_death
+
+    fig, ax = plt.subplots(figsize=fig_size)
+    # pick a colormap with enough distinct colors
+    cmap = cm.get_cmap('tab10', len(filtered))
+
+    for idx, pts in enumerate(filtered):
+        if pts.size == 0:
+            continue
+        ax.scatter(
+            pts[:, 0],
+            pts[:, 1],
+            s=15,
+            label=f'H{idx}',
+            color=cmap(idx),
+            clip_on=False,
+        )
+
+    # diagonal
+    ax.plot([0, margin], [0, margin], '--', color='k', linewidth=1)
+
+    # threshold line (parallel to diagonal)
+    if threshold is not None:
+        offset = threshold * max_death
+        ax.plot([0, margin], [offset, margin + offset], '--', color='red', linewidth=1)
+
+    ax.set_xlim(0, margin)
+    ax.set_ylim(0, margin)
+    ax.set_xlabel('Birth', fontsize=font_size)
+    ax.set_ylabel('Death', fontsize=font_size)
+    ax.tick_params(axis='both', labelsize=font_size)
+    ax.legend(fontsize=font_size)
+    fig.tight_layout()
+
+    if file_path is not None:
+        out = Path(file_path)
+        out.parent.mkdir(parents=True, exist_ok=True)
+        fig.savefig(out, bbox_inches='tight')
+
+    return fig

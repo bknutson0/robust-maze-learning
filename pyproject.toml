@@ -17,6 +17,7 @@ dependencies = [
     "ripser>=0.6.12",
     "termcolor>=3.1.0",
     "omegaconf>=2.3.0",
+    "plotly>=6.1.1",
 ]
 
 [dependency-groups]

@@ -1224,6 +1224,15 @@ wheels = [
 ]
 
 [[package]]
+name = "narwhals"
+version = "1.40.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/f0/57/283881d06788c2fddd05eb7f0d6c82c5116d2827e83b845c796c74417c56/narwhals-1.40.0.tar.gz", hash = "sha256:17064abffd264ea1cfe6aefc8a0080f3a4ffb3659a98bcad5456ca80b88f2a0a", size = 487625, upload-time = "2025-05-19T07:44:12.103Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/2c/e6/4d16dfa26f40230593c216bf695da01682fdbdf6af4e79abef572ab26bce/narwhals-1.40.0-py3-none-any.whl", hash = "sha256:1e6c731811d01c61147c52433b4d4edfb6511aaf2c859aa01c2e8ca6ff4d27e5", size = 357340, upload-time = "2025-05-19T07:44:10.11Z" },
+]
+
+[[package]]
 name = "nbclient"
 version = "0.10.2"
 source = { registry = "https://pypi.org/simple" }
@@ -1619,6 +1628,19 @@ wheels = [
 ]
 
 [[package]]
+name = "plotly"
+version = "6.1.1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "narwhals" },
+    { name = "packaging" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/8a/7c/f396bc817975252afbe7af102ce09cd12ac40a8e90b8699a857d1b15c8a3/plotly-6.1.1.tar.gz", hash = "sha256:84a4f3d36655f1328fa3155377c7e8a9533196697d5b79a4bc5e905bdd09a433", size = 7543694, upload-time = "2025-05-20T20:09:31.935Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/75/f3/f8cb7066f761e2530e1280889e3413769891e349fca35ee7290e4ace35f5/plotly-6.1.1-py3-none-any.whl", hash = "sha256:9cca7167406ebf7ff541422738402159ec3621a608ff7b3e2f025573a1c76225", size = 16118469, upload-time = "2025-05-20T20:09:26.196Z" },
+]
+
+[[package]]
 name = "pluggy"
 version = "1.5.0"
 source = { registry = "https://pypi.org/simple" }
@@ -1963,6 +1985,7 @@ dependencies = [
     { name = "maze-dataset" },
     { name = "numpy" },
     { name = "omegaconf" },
+    { name = "plotly" },
     { name = "ripser" },
     { name = "scipy" },
     { name = "tensorboard" },
@@ -1983,6 +2006,7 @@ requires-dist = [
     { name = "maze-dataset", git = "https://github.com/understanding-search/maze-dataset?branch=dev" },
     { name = "numpy", specifier = "==1.26.4" },
     { name = "omegaconf", specifier = ">=2.3.0" },
+    { name = "plotly", specifier = ">=6.1.1" },
     { name = "ripser", specifier = ">=0.6.12" },
     { name = "scipy", specifier = ">=1.15.1" },
     { name = "tensorboard", specifier = ">=2.18.0" },

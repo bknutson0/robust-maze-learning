@@ -478,54 +478,6 @@ def plot_test(
     handlers[plot_type](test_names, filters, combined_dir, value)  # type: ignore
 
 
-# def plot_mazes(
-#     inputs: torch.Tensor | None = None,
-#     solutions: torch.Tensor | None = None,
-#     predictions: torch.Tensor | None = None,
-#     file_name: str = 'outputs/visuals/mazes/mazes',
-# ) -> None:
-#     """Plot mazes inputs, solutions, and/or predictions, batched or not, and save the plot to a file."""
-#     if all(x is None for x in [inputs, solutions, predictions]):
-#         raise ValueError('At least one of inputs, solutions, or predictions must be provided.')
-
-#     for tensor, name in zip([inputs, solutions, predictions], ['Inputs', 'Solutions', 'Predictions'], strict=False):
-#         if tensor is not None and tensor.size(0) == 0:
-#             raise ValueError(f'{name} tensor has zero batch size.')
-
-#     if inputs is not None and inputs.dim() == 3:
-#         inputs = inputs.unsqueeze(0)
-#     if solutions is not None and solutions.dim() == 2:
-#         solutions = solutions.unsqueeze(0)
-#     if predictions is not None and predictions.dim() == 2:
-#         predictions = predictions.unsqueeze(0)
-
-#     batch_size = max(x.size(0) if x is not None else 0 for x in [inputs, solutions, predictions])
-
-#     mazes = [
-#         (maze, title)
-#         for maze, title in zip([inputs, solutions, predictions], ['Inputs', 'Solutions', 'Predictions'], strict=False)
-#         if maze is not None
-#     ]
-#     num_cols = len(mazes)
-
-#     fig, axes = plt.subplots(batch_size, num_cols, figsize=(3.5 * num_cols, 3.5 * batch_size), dpi=300, squeeze=False)
-
-#     for row in range(batch_size):
-#         for col, (maze, title) in enumerate(mazes):
-#             ax = axes[row, col] if batch_size > 1 else axes[col]
-#             ax.imshow(
-#                 maze[row].permute(1, 2, 0).cpu().numpy() if title == 'Inputs' else maze[row].cpu().numpy(), cmap='gray'
-#             )
-#             ax.set_title(title, fontsize=config.subplot_title_size, pad=10)
-#             ax.axis('off')
-
-#     plt.subplots_adjust(wspace=0.1, hspace=0.2)
-#     os.makedirs(os.path.dirname(file_name), exist_ok=True)
-#     plt.savefig(f'{file_name}.pdf', bbox_inches='tight')
-#     logger.info(f'Saved maze plot to {file_name}.pdf')
-#     plt.close()
-
-
 def plot_mazes(
     names_mazes: Sequence[tuple[str, object]],
     file_name: str = 'outputs/visuals/mazes/mazes',
@@ -579,14 +531,3 @@ def plot_mazes(
     os.makedirs(os.path.dirname(file_name), exist_ok=True)
     fig.savefig(f'{file_name}.pdf', bbox_inches='tight')
     plt.close(fig)
-
-
-def plot_predictions(test_name: str, correct: bool | None = None) -> None:
-    """Plot model predictions, possibly filtering by correctness, and save the plot to a file."""
-    df = pd.read_csv(f'outputs/tests/{test_name}/results.csv')
-
-    maze_sizes = df['test_maze_size'].unique()
-    if len(maze_sizes) > 1:
-        raise NotImplementedError(f'Expected single maze size for each model, got {maze_sizes = }')
-
-    # implement prediction plotting logic here
