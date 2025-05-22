@@ -149,7 +149,7 @@ class TDAParameters(TestParameters):
     """Parameters for running TDA."""
 
     iters: list[int] = field(default_factory=lambda: list(range(3001, 3401)))
-    dtype: DTypeLike = np.float32
+    dtype: DTypeLike = np.float64
     embed_dim: int = 0
     delay: int = 1
     max_homo: int = 1

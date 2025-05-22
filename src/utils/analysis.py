@@ -10,6 +10,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import torch
+from matplotlib.figure import Figure
 
 from src.utils.config import LOGGING_LEVEL, PlotConfig
 
@@ -479,32 +480,51 @@ def plot_test(
 
 
 def plot_mazes(
-    names_mazes: Sequence[tuple[str, object]],
+    names_mazes: Sequence[tuple[str, torch.Tensor]],
     file_name: str = 'outputs/visuals/mazes/mazes',
     dpi: int = 300,
     figsize: float = 3.5,
     title_pad: float = 8,
-) -> None:
+) -> Figure:
     """Plot each (name, tensor or list of tensors) as a column; rows = batch items."""
-    # Validate input
+    # 1) drop any empty columns
+    names_mazes = [(n, m) for n, m in names_mazes if m is not None]
     if not names_mazes:
-        raise ValueError('Need at least one (name, tensor) pair.')
+        raise ValueError('Need at least one non-None (name, tensor) pair.')
 
-    # Prepare tensors
+    # 2) stack / normalize to [B, C, H, W]
     proc = []
     for name, mazes in names_mazes:
-        x = torch.stack(mazes, 0) if isinstance(mazes, list | tuple) else mazes
-        if not torch.is_tensor(x):
-            raise TypeError(f"Values for '{name}' must be a torch.Tensor or list of them.")
-        if x.ndim == 2 or (x.ndim == 3 and x.shape[0] in (1, 3)):
-            x = x.unsqueeze(0)
-        if x.ndim not in (3, 4) or x.shape[0] == 0:
+        if isinstance(mazes, (list, tuple)):
+            x = torch.stack(mazes, 0)
+        elif torch.is_tensor(mazes):
+            x = mazes
+        else:
+            raise TypeError(f"Values for '{name}' must be a Tensor or list/tuple of them.")
+
+        # now force a 4-D shape: [B, C, H, W]
+        if x.ndim == 2:  # H×W → [1,1,H,W]
+            x = x.unsqueeze(0).unsqueeze(0)
+        elif x.ndim == 3:
+            if x.shape[0] in (1, 3):  # C×H×W → [1,C,H,W]
+                x = x.unsqueeze(0)
+            else:  # B×H×W → [B,1,H,W]
+                x = x.unsqueeze(1)
+        elif x.ndim == 4:
+            pass
+        else:
             raise ValueError(f"Invalid shape {tuple(x.shape)} for '{name}'.")
+
         proc.append((name, x))
 
-    # Create subplots
+    # 3) make sure all batch sizes agree
+    batch_sizes = [x.shape[0] for _, x in proc]
+    if len(set(batch_sizes)) != 1:
+        raise ValueError(f'All inputs must have the same batch size; got {batch_sizes}')
+    batch = batch_sizes[0]
     n_cols = len(proc)
-    batch = max(x.shape[0] for _, x in proc)
+
+    # 4) build the grid
     fig, axes = plt.subplots(
         batch,
         n_cols,
@@ -512,22 +532,28 @@ def plot_mazes(
         dpi=dpi,
         squeeze=False,
     )
+    # a bit of breathing room
+    fig.subplots_adjust(wspace=0.05, hspace=0.05)
 
-    # Plot images
+    # 5) draw each cell exactly once
     for r in range(batch):
         for c, (name, x) in enumerate(proc):
             ax = axes[r, c]
+            ax.clear()
             img = x[r].cpu().numpy()
             if img.ndim == 3:  # C×H×W → H×W×C
                 img = img.transpose(1, 2, 0)
-            ax.imshow(img, cmap='gray' if img.ndim == 2 else None)
-            ax.set_title(name, pad=title_pad)
+                ax.imshow(img)
+            else:  # H×W
+                ax.imshow(img, cmap='gray')
+            # only title the top row
+            if r == 0:
+                ax.set_title(name, pad=title_pad)
             ax.axis('off')
 
-    # Adjust spacing
+    # 6) save + close
     fig.tight_layout(pad=(title_pad / 72) + 0.1)
-
-    # Save figure
     os.makedirs(os.path.dirname(file_name), exist_ok=True)
     fig.savefig(f'{file_name}.pdf', bbox_inches='tight')
     plt.close(fig)
+    return fig

@@ -50,7 +50,7 @@ def get_diagram(
 
     # Convert from torch tensor to cpu numpy array
     if isinstance(X, torch.Tensor):
-        X = X.cpu().numpy()  # type: ignore
+        X = X.detach().cpu().numpy()  # type: ignore
 
     # Ensure desired precision
     X = X.astype(dtype)  # type: ignore
@@ -73,9 +73,7 @@ def get_diagram(
     logger.info(f'Computed {distance_matrix.shape = } with {max_distance = :.3f}')
 
     # Use ripser to compute persistence diagram
-    print(f'{max_homo = }')
     diagram = ripser(distance_matrix, maxdim=max_homo, coeff=2, distance_matrix=True)['dgms']
-    print(f'{diagram[1] = }')
 
     return diagram, max_distance
 
@@ -417,6 +415,7 @@ def sample_torus(n: int = 1000, R: float = 2.0, r: float = 0.5, hollow: bool = F
 def get_pca(X: NDArray[Any] | torch.Tensor, n: int = 2) -> NDArray[Any]:
     """Project rows of data matrix X onto n principal components using SVD."""
     # Move X to GPU
+    X = torch.cat(X, dim=0) if isinstance(X, list) else X
     X = X.to(DEVICE) if isinstance(X, torch.Tensor) else torch.tensor(X, dtype=torch.float32, device=DEVICE)
 
     # Flatten data
