@@ -1,3 +1,5 @@
+import numpy as np
+
 from src.utils.config import TDAParameters
 from src.utils.tda import tda
 
@@ -16,6 +18,7 @@ def main() -> None:
     params.maze_size = [9, 19, 29, 39, 49, 59, 69]
     params.iters = list(range(3001, 3401))
     params.percolation = [0.0]
+    params.dtype = np.float64
 
     # Perform TDA
     tda(params=params)

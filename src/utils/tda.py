@@ -451,9 +451,10 @@ def plot_diagram(
     # filter out infinite deaths
     filtered = [d[np.isfinite(d[:, 1])] for d in diagram]
     if not filtered or all(d.size == 0 for d in filtered):
-        raise ValueError('No finite death values found in any diagram.')
+        return None
 
     max_death = get_max_finite_death(diagram)
+
     margin = 1.05 * max_death
 
     fig, ax = plt.subplots(figsize=fig_size)
