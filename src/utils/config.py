@@ -11,7 +11,7 @@ from numpy.typing import DTypeLike
 
 # Device configuration
 # Prioritize PREFERRED_CUDA > CUDA > MPS > CPU
-PREFERRED_CUDA = 1
+PREFERRED_CUDA = 0
 DEVICE = None
 if torch.cuda.is_available():
     if torch.cuda.device_count() > PREFERRED_CUDA:
