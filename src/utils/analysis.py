@@ -26,7 +26,7 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # Valid model prefixes
-ALLOWED_MODELS = ('dt_net', 'it_net', 'ff_net', 'deadend_fill')
+ALLOWED_MODELS = ('dt_net', 'it_net', 'ff_net', 'pi_net', 'deadend_fill')
 
 
 def filter_dataframe(df: pd.DataFrame, filters: dict[str, Any] | None = None) -> pd.DataFrame:
@@ -238,13 +238,25 @@ def plot_value_vs_size_perc(
     else:
         cbar_label = value.replace('_', ' ').title()
 
-    cmap = plt.get_cmap('coolwarm')
+    # Select colormap
+    cmap = plt.get_cmap('cividis') if value == 'matches_deadend_fill' else plt.get_cmap('coolwarm')
+
     all_summaries: list[tuple[str, str, list[tuple[str, float | None, float | None, pd.DataFrame]]]] = []
 
     # 1) collect per-test summaries
     for name in test_names:
-        df = load_results(name, filters)
-        model_type = infer_model_type(df)
+        # load raw results
+        path = Path('outputs') / 'tests' / name / 'results.csv'
+        df = pd.read_csv(path)
+
+        # now apply only the filters you care about
+        if filters:
+            for col, vals in filters.items():
+                vals_list = vals if isinstance(vals, list) else [vals]
+                if col not in df.columns:
+                    raise KeyError(f"Column '{col}' not in DataFrame.")
+                df = df[df[col].isin(vals_list)]
+                model_type = infer_model_type(df)
 
         summary: list[tuple[str, float | None, float | None, pd.DataFrame]] = []
         for m in df['model_name'].unique():
@@ -265,7 +277,7 @@ def plot_value_vs_size_perc(
 
         # dynamic font sizes
         _, fh = fig.get_size_inches()
-        title_fs = max(12, fh * 5)
+        title_fs = max(10, fh * 3.5)  # was fh*5
         label_fs = max(10, fh * 4)
         tick_fs = max(8, fh * 3)
 
@@ -305,8 +317,9 @@ def plot_value_vs_size_perc(
                     tp,
                     marker='*',
                     s=300,
-                    edgecolors='gold',
                     facecolors='gold',
+                    edgecolors='black',  # black border
+                    linewidths=1.5,
                     zorder=4,
                 )
                 if first_star is None:
@@ -315,33 +328,36 @@ def plot_value_vs_size_perc(
         # colorbar
         cbar = fig.colorbar(im, ax=axes.tolist(), fraction=0.06, pad=0.03, shrink=0.9)
         cbar.ax.tick_params(labelsize=tick_fs)
-        cbar.ax.yaxis.label.set_size(label_fs)
+        cbar.ax.yaxis.label.set_fontsize(label_fs)
         cbar.set_label(cbar_label, fontsize=label_fs)
 
         out_dir = Path('outputs') / 'tests' / name
         out_dir.mkdir(parents=True, exist_ok=True)
         fig.savefig(out_dir / 'acc_vs_size_perc.pdf', bbox_inches='tight')
         plt.close(fig)
-
     # 3) combined grid
     if not all_summaries:
         return
 
     n_tests = len(all_summaries)
     n_models = len(all_summaries[0][2])
+
+    # (1) increase per‐subplot size, (2) enable constrained_layout
     fig, axes = plt.subplots(
         n_tests,
         n_models,
-        figsize=(4 * n_models, 3.5 * n_tests),
+        figsize=(5 * n_models, 4 * n_tests),
         sharex=True,
         sharey=True,
+        constrained_layout=True,
     )
-    axes = np.atleast_2d(axes)
+    axes = np.array(axes).reshape(n_tests, n_models)
 
+    # compute font sizes based on the new fig size
     _, fh = fig.get_size_inches()
-    title_fs = max(12, fh * 5)
-    label_fs = max(10, fh * 4)
-    tick_fs = max(8, fh * 3)
+    title_fs = max(9, fh * 2)
+    label_fs = max(9, fh * 2)
+    tick_fs = max(8, fh * 1.5)
 
     first_handle = None
     for i, (_name, model_type, summary) in enumerate(all_summaries):
@@ -361,13 +377,13 @@ def plot_value_vs_size_perc(
             )
 
             ax.set_title(
-                f'Train Perc. = {tp:.3f}' if tp is not None else 'Train Perc. = NaN',
+                f'Train Perc. = {tp:.3f}' if tp is not None else 'Train Perc. = NaN',
                 fontsize=title_fs,
             )
             if i == n_tests - 1:
                 ax.set_xlabel('Maze Size', fontsize=label_fs)
             if j == 0:
-                ax.set_ylabel(f'{model_type}\nTest Perc.', fontsize=label_fs)
+                ax.set_ylabel(f'{model_type}\nTest Perc.', fontsize=label_fs)
             ax.tick_params(labelsize=tick_fs)
 
             if tp is not None and ts is not None:
@@ -376,8 +392,9 @@ def plot_value_vs_size_perc(
                     tp,
                     marker='*',
                     s=300,
-                    edgecolors='gold',
                     facecolors='gold',
+                    edgecolors='black',
+                    linewidths=1.5,
                     zorder=4,
                     clip_on=False,
                     label=('Training distribution' if first_handle is None else '_nolegend_'),
@@ -385,9 +402,10 @@ def plot_value_vs_size_perc(
                 if first_handle is None:
                     first_handle = handle
 
+    # colorbar
     cbar = fig.colorbar(im, ax=axes.ravel().tolist(), fraction=0.06, pad=0.03, shrink=0.9)
     cbar.ax.tick_params(labelsize=tick_fs)
-    cbar.ax.yaxis.label.set_size(label_fs)
+    cbar.ax.yaxis.label.set_fontsize(label_fs)
     cbar.set_label(cbar_label, fontsize=label_fs)
 
     combined_dir.mkdir(parents=True, exist_ok=True)

@@ -1,4 +1,6 @@
-from src.utils.analysis import load_results, plot_test
+import pandas as pd
+
+from src.utils.analysis import plot_test
 
 
 def main() -> None:
@@ -24,24 +26,29 @@ def main() -> None:
     # ff_net_test_name = '2025-04-21_12:48:32'
     ff_net_test_name = '2025-04-27_14:07:46'  # Add matches_deadend_fill column
 
+    # pi_net
+    pi_net_test_name = '2025-05-22_12:19:48'
+
     # deadend_fill
     deadend_fill_test_name = '2025-04-26_21:46:00'
 
     # test_names = [ff_net_test_name, dt_net_test_name, it_net_test_name]
     test_names = [
-        # dt_net_original_test_name
+        # dt_net_original_test_name,
+        # pi_net_test_name,
         ff_net_test_name,
         dt_net_test_name,
         it_net_test_name,
         # deadend_fill_test_name
     ]
 
-    df = load_results(dt_net_original_test_name)
-    print(df.head(20))
+    df = pd.read_csv('./outputs/tests/' + pi_net_test_name + '/results.csv')
+    # print(df.head(20))
     # Print unique values in each column
     for column in df.columns:
-        unique_values = df[column].unique()
-        print(f'{column}: {unique_values}')
+        if column != 'maze_index':
+            unique_values = df[column].unique()
+            # print(f'{column}: {unique_values}')
 
     # # For each model_name, print train_percolation
     # model_names = df['model_name'].unique().tolist()
@@ -71,11 +78,12 @@ def main() -> None:
     #         },
     #     )
 
-    # Create heatmap for agreement of dt_net_original with deadend_fill
+    # Create heatmap for agreement with deadend_fill
     plot_test(
         test_names,
         plot_type='value_vs_size_perc',
-        filters={'percolation': [0.0, 0.001, 0.1, 0.3, 0.5, 0.7, 0.9, 0.99], 'test_iter': 200},
+        filters={'train_percolation': [0.0, 0.001, 0.1, 0.5, 0.99], 'test_iter': 200},
+        # filters={'test_iter': 200},
         value='matches_deadend_fill',
     )
 
