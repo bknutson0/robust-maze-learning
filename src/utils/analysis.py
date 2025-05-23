@@ -510,7 +510,7 @@ def plot_mazes(
 
     proc = []
     for name, mazes in names_mazes:
-        if isinstance(mazes, (list, tuple)):
+        if isinstance(mazes, list | tuple):
             x = torch.stack(mazes, dim=0)
         elif torch.is_tensor(mazes):
             x = mazes
@@ -521,10 +521,7 @@ def plot_mazes(
         if x.ndim == 2:
             x = x.unsqueeze(0).unsqueeze(0)
         elif x.ndim == 3:
-            if x.shape[0] in (1, 3):
-                x = x.unsqueeze(0)
-            else:
-                x = x.unsqueeze(1)
+            x = x.unsqueeze(0) if x.shape[0] in (1, 3) else x.unsqueeze(1)
         elif x.ndim != 4:
             raise ValueError(f"Invalid shape {tuple(x.shape)} for '{name}'.")
 
@@ -541,7 +538,7 @@ def plot_mazes(
             img = x[r].cpu().numpy()
             # Handle channels
             if img.ndim == 3:
-                C, H, W = img.shape
+                C, H, W = img.shape  # noqa
                 if C == 1:
                     ax.imshow(img[0], cmap='gray')
                 elif C == 3:

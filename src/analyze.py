@@ -1,3 +1,5 @@
+# ruff: noqa: F841
+
 import pandas as pd
 
 from src.utils.analysis import plot_test
