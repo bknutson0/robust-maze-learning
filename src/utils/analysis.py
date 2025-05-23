@@ -483,16 +483,15 @@ def plot_mazes(
     names_mazes: Sequence[tuple[str, torch.Tensor]],
     file_name: str = 'outputs/visuals/mazes/mazes',
     dpi: int = 300,
-    figsize: float = 3.5,
+    figsize: float = 3,
     title_pad: float = 8,
 ) -> Figure:
-    """Plot each (name, tensor or list of tensors) as a column; rows = batch items."""
+    """Plot each (name, tensor or list of tensors) as a column; rows = batch items, save to PDF."""
     if not names_mazes:
         raise ValueError('Need at least one (name, tensor) pair.')
 
     proc = []
     for name, mazes in names_mazes:
-        # accept either a single tensor or a list/tuple of tensors
         if isinstance(mazes, (list, tuple)):
             x = torch.stack(mazes, dim=0)
         elif torch.is_tensor(mazes):
@@ -500,20 +499,15 @@ def plot_mazes(
         else:
             raise TypeError(f"Values for '{name}' must be a torch.Tensor or list/tuple of them.")
 
-        # normalize to [batch, channels, H, W]
+        # Normalize to [B, C, H, W]
         if x.ndim == 2:
-            # single grayscale image H×W
             x = x.unsqueeze(0).unsqueeze(0)
         elif x.ndim == 3:
             if x.shape[0] in (1, 3):
-                # single color or single‐channel image C×H×W
                 x = x.unsqueeze(0)
             else:
-                # batch of grayscale images B×H×W → B×1×H×W
                 x = x.unsqueeze(1)
-        elif x.ndim == 4:
-            pass
-        else:
+        elif x.ndim != 4:
             raise ValueError(f"Invalid shape {tuple(x.shape)} for '{name}'.")
 
         proc.append((name, x))
@@ -521,31 +515,30 @@ def plot_mazes(
     n_cols = len(proc)
     batch = max(x.shape[0] for _, x in proc)
 
-    fig, axes = plt.subplots(
-        batch,
-        n_cols,
-        figsize=(figsize * n_cols, figsize * batch),
-        dpi=dpi,
-        squeeze=False,
-    )
+    fig, axes = plt.subplots(batch, n_cols, figsize=(figsize * n_cols, figsize * batch), dpi=dpi, squeeze=False)
 
     for r in range(batch):
         for c, (name, x) in enumerate(proc):
             ax = axes[r, c]
-            img = x[r].cpu().numpy()  # now shape is either (C,H,W) or (H,W)
-            if img.ndim == 3:  # C×H×W → H×W×C
-                img = img.transpose(1, 2, 0)
-                ax.imshow(img)
-            else:  # H×W
+            img = x[r].cpu().numpy()
+            # Handle channels
+            if img.ndim == 3:
+                C, H, W = img.shape
+                if C == 1:
+                    ax.imshow(img[0], cmap='gray')
+                elif C == 3:
+                    ax.imshow(img.transpose(1, 2, 0))
+                else:
+                    raise ValueError(f"Unsupported channel count {C} in '{name}'")
+            else:
                 ax.imshow(img, cmap='gray')
+
             if r == 0:
                 ax.set_title(name, pad=title_pad)
             ax.axis('off')
 
     fig.tight_layout(pad=(title_pad / 72) + 0.1)
 
-    # ensure output dir exists
     os.makedirs(os.path.dirname(file_name), exist_ok=True)
     fig.savefig(f'{file_name}.pdf', bbox_inches='tight')
-    # (don’t plt.close here if you want to keep using fig)
     return fig
