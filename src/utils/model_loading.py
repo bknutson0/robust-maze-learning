@@ -63,7 +63,7 @@ def load_model(model_name: str | None = None, pretrained: str | None = None, wei
 
         # load and patch config
         with open(cfg_path) as f:
-            cfg_dict = yaml.load(f, Loader=yaml.FullLoader)
+            cfg_dict = yaml.safe_load(f)
         cfg = OmegaConf.create(cfg_dict)
         cfg.problem.deq.jacobian_factor = 1.0
         cfg.problem.model.model_path = pretrained
@@ -188,7 +188,7 @@ def summarize_models() -> None:
             continue
 
         # load model to CPU
-        model = load_model(pretrained=pth_path).cpu()
+        model = load_model(pretrained=pth_path).to('cpu')
 
         # compute parameter count and size
         total_params = sum(p.numel() for p in model.parameters())

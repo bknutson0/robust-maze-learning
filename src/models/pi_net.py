@@ -406,9 +406,7 @@ class PINet(DEQNet, BaseNet):
         # This calls DEQNet.__init__(width, config, in_channels),
         # which in turn calls BaseNet.__init__() → nn.Module.__init__()
         super().__init__(width, config, in_channels=in_channels)
-
-    def name(self):
-        return 'pi_net'
+        self.name = 'pi_net'
 
     def input_to_latent(self, inputs):
         # Reset deq normalization after loading weights
