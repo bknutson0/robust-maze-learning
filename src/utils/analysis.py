@@ -39,6 +39,7 @@ def filter_dataframe(df: pd.DataFrame, filters: dict[str, Any] | None = None) ->
         if col not in df.columns:
             raise KeyError(f"Column '{col}' not found in DataFrame.")
         mask &= df[col].isin(vals_list)
+
     return df[mask]
 
 
@@ -46,6 +47,9 @@ def load_results(test_name: str, filters: dict[str, Any] | None = None) -> pd.Da
     """Load and optionally filter test results for a given test."""
     path = Path('outputs') / 'tests' / test_name / 'results.csv'
     df = pd.read_csv(path)
+    # Rename column 'maze_size' to 'test_maze_size' if it exists, for backward compatibility
+    if 'maze_size' in df.columns:
+        df.rename(columns={'maze_size': 'test_maze_size'}, inplace=True)
     return filter_dataframe(df, filters)
 
 
@@ -114,11 +118,13 @@ def plot_overall_acc_vs_perc(test_names: list[str], filters: dict[str, Any] | No
         plt.close(fig)
 
 
-def plot_acc_vs_perc(test_names: list[str], filters: dict[str, Any] | None, combined_dir: Path) -> None:
+def plot_acc_vs_perc(
+    test_names: list[str], filters: dict[str, Any] | None, combined_dir: Path, value: str | None = None
+) -> None:
     """Plot accuracy vs test percolation, per test and combined."""
     cmap = plt.get_cmap('plasma')
 
-    # 1) Individual plots (updated size & line width)
+    # Individual plots
     for name in test_names:
         df = load_results(name, filters)
         # Ensure single test_maze_size
@@ -135,27 +141,35 @@ def plot_acc_vs_perc(test_names: list[str], filters: dict[str, Any] | None, comb
         vals = [tp if tp > 0 else 1e-3 for tp in tps]
         norm = mcolors.Normalize(vmin=min(vals), vmax=max(vals))
 
-        # bigger figure:
         fig, ax = plt.subplots(figsize=(12, 6))
         for m, tp in zip(models, tps, strict=False):
             dfm = df[df['model_name'] == m]
             sub = dfm.groupby('test_percolation')['correct'].mean().reset_index()
             color = cmap(norm(tp if tp > 0 else 1e-3))
-            # thicker lines:
-            ax.plot(sub['test_percolation'], sub['correct'], marker='o', linewidth=2, label=f'{tp:.3f}', color=color)
+            ax.plot(
+                sub['test_percolation'],
+                sub['correct'],
+                marker='o',
+                linewidth=6,
+                markersize=12,
+                label=f'{tp:.3f}',
+                color=color,
+                clip_on=False,
+            )
             ax.axvline(tp, linestyle='--', color=color, linewidth=2)
 
         ax.set(xlim=(0, 1), ylim=(0, 1), xlabel='Test Percolation', ylabel='Test Accuracy', title=model_type)
-
+        ax.grid(True, which='both', linestyle='--', linewidth=0.5, alpha=0.7)
         fig.subplots_adjust(right=0.75)
         ax.legend(title='Train Perc.', loc='center left', bbox_to_anchor=(1.02, 0.5))
 
         out = Path('outputs') / 'tests' / name / 'acc_vs_perc.pdf'
         out.parent.mkdir(parents=True, exist_ok=True)
         fig.savefig(out, bbox_inches='tight')
+        logger.info(f'Saved individual plot for {name} to {out}')
         plt.close(fig)
 
-    # 2) Combined row of subplots
+    # Combined row of subplots
     if len(test_names) > 1:
         combined_dir.mkdir(parents=True, exist_ok=True)
         fig_comb, axes = plt.subplots(
@@ -214,6 +228,7 @@ def plot_acc_vs_perc(test_names: list[str], filters: dict[str, Any] | None, comb
 
         out_comb = combined_dir / 'combined_acc_vs_perc.pdf'
         fig_comb.savefig(out_comb, bbox_inches='tight')
+        logger.info(f'Saved combined plot to {out_comb}')
         plt.close(fig_comb)
 
 

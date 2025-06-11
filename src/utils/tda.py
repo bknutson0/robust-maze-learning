@@ -306,7 +306,7 @@ def add_betti_column(df: DataFrame, threshold: float) -> DataFrame:
     return df2
 
 
-def make_betti_table(df: DataFrame) -> DataFrame:
+def make_betti_table(df: DataFrame, most_common: int = 3) -> DataFrame:
     """Create a summary table of Betti number distributions."""
     models = sorted(df['model_name'].unique())
     sizes = sorted(df['test_maze_size'].unique())
@@ -317,11 +317,11 @@ def make_betti_table(df: DataFrame) -> DataFrame:
             sub = df[(df['model_name'] == m) & (df['test_maze_size'] == s)]
             counts = Counter(sub['betti_nums'])
             total = sum(counts.values())
-            most_common = counts.most_common(3)
+            most_common_counts = counts.most_common(most_common)
 
             # format entries with HTML <br>
-            entries = [f'[{b0},{b1}]-{cnt}' for (b0, b1), cnt in most_common]
-            rest = total - sum(cnt for _, cnt in most_common)
+            entries = [f'[{b0},{b1}]-{cnt}' for (b0, b1), cnt in most_common_counts]
+            rest = total - sum(cnt for _, cnt in most_common_counts)
             entries.append(f'Other-{rest}')
 
             table.at[m, s] = '<br>'.join(entries)

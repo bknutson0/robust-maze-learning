@@ -58,16 +58,23 @@ def main() -> None:
     #     train_percolation = df[df['model_name'] == model_name]['train_percolation'].unique()
     #     print(f'{model_name = }, {train_percolation[0] = }')
 
-    # # Plot test accuracy versus test percolation for models trained with different percolations
-    # plot_test_accuracies(
-    #     it_net_test_name,
-    #     'acc_vs_perc',
-    #     filters={
-    #         'test_iter': 300,
-    #         'test_maze_size': 9,
-    #         'train_percolation': [0.0, 0.2, 0.4, 0.6, 0.8, 0.99],
-    #     },
-    # )
+    # Plot test accuracy versus test percolation for models trained with different percolations
+    plot_test(
+        test_names=[dt_net_original_test_name],
+        plot_type='acc_vs_perc',
+        filters={
+            'test_iter': 200,
+            'test_maze_size': 9,
+        },
+    )
+    plot_test(
+        test_names=[pi_net_test_name],
+        plot_type='acc_vs_perc',
+        filters={
+            'test_iter': 200,
+            'test_maze_size': 9,
+        },
+    )
 
     # # Plot test accuracy heatmap versus maze size and test percolation for models trained with different percolations
     # for percolation in [0.0, 0.001, 0.003, 0.01, 0.03, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 0.99]:
@@ -80,14 +87,14 @@ def main() -> None:
     #         },
     #     )
 
-    # Create heatmap for agreement with deadend_fill
-    plot_test(
-        test_names,
-        plot_type='value_vs_size_perc',
-        filters={'train_percolation': [0.0, 0.001, 0.1, 0.5, 0.99], 'test_iter': 200},
-        # filters={'test_iter': 200},
-        value='matches_deadend_fill',
-    )
+    # # Create heatmap for agreement with deadend_fill
+    # plot_test(
+    #     test_names,
+    #     plot_type='value_vs_size_perc',
+    #     filters={'train_percolation': [0.0, 0.001, 0.1, 0.5, 0.99], 'test_iter': 200},
+    #     # filters={'test_iter': 200},
+    #     value='matches_deadend_fill',
+    # )
 
     # # Plot test accuracy versus train percolation
     # plot_test_accuracies(
