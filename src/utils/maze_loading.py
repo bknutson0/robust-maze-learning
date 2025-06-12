@@ -4,6 +4,7 @@ from typing import Any
 
 import muutils
 import torch
+from easy_to_hard_data import MazeDataset as EasyToHardMazeDataset
 from maze_dataset import set_serialize_minimal_threshold
 from maze_dataset.dataset import MazeDataset, MazeDatasetConfig
 from maze_dataset.dataset.rasterized import RasterizedMazeDataset
@@ -30,7 +31,7 @@ def _load_mazes(
     """Generate at least num_mazes mazes, recursively doubling the number of mazes attempted if none are generated."""
     # Initially, attempt to generate exactly the desired number of mazes
     if num_mazes_attempt is None:
-        num_mazes_attempt = params.num_mazes  # type: ignore
+        num_mazes_attempt = params.num_mazes
 
     logger.info(
         f'Attempting {num_mazes_attempt} mazes to generate {params.num_mazes} mazes with size: {params.maze_size}, '
@@ -89,15 +90,15 @@ def _load_mazes(
     )
 
     # If not enough mazes were generated, attempt with between 2 and num_mazes_attempt times as many mazes
-    if len(base_dataset) < params.num_mazes:  # type: ignore
-        if params.num_mazes > 10**9:  # type: ignore
+    if len(base_dataset) < params.num_mazes:
+        if params.num_mazes > 10**9:
             raise ValueError(f'Failed to generate any mazes after attempting with {params.num_mazes = }')
         else:
             num_mazes_result = len(base_dataset)
-            new_num_mazes_attempt_1 = num_mazes_attempt // max(num_mazes_result, 1) * params.num_mazes  # type: ignore
-            new_num_mazes_attempt_2 = 2 * num_mazes_attempt  # type: ignore
+            new_num_mazes_attempt_1 = num_mazes_attempt // max(num_mazes_result, 1) * params.num_mazes
+            new_num_mazes_attempt_2 = 2 * num_mazes_attempt
             new_num_mazes_attempt = max(new_num_mazes_attempt_1, new_num_mazes_attempt_2)
-            return _load_mazes(params, new_num_mazes_attempt)  # type: ignore
+            return _load_mazes(params, new_num_mazes_attempt)
 
     # Otherwise return the desired number of mazes
     else:
@@ -105,13 +106,13 @@ def _load_mazes(
         dataset = dataset.get_batch(idxs=None)  # type: ignore
 
         # Get inputs
-        inputs = dataset[0, 0 : params.num_mazes, :, :]  # type: ignore
+        inputs = dataset[0, 0 : params.num_mazes, :, :]
         inputs = inputs / 255.0
         inputs = inputs.permute(0, 3, 1, 2)
         inputs = inputs.float().detach().to(DEVICE, dtype=torch.float32)
 
         # Get solutions
-        solutions = dataset[1, 0 : params.num_mazes, :, :]  # type: ignore
+        solutions = dataset[1, 0 : params.num_mazes, :, :]
         solutions = solutions / 255.0
         solutions = solutions.permute(0, 3, 1, 2)
         solutions, _ = torch.max(solutions, dim=1)
@@ -137,20 +138,20 @@ def load_mazes(params: Hyperparameters | TestParameters) -> tuple[torch.Tensor, 
         return inputs, solutions
 
     elif params.dataset_name == 'easy-to-hard-data':
-        raise NotImplementedError('Easy-to-hard-data not implemented yet.')
-        # from easy_to_hard_data import MazeDataset as EasyToHardMazeDataset TODO: Fix import
-        # """ https://github.com/aks2203/easy-to-hard-data """
-        # # 50,000 training mazes for maze_size [9]
-        # # 10,000 testing mazes for each smaller maze_size in [9, 11, 13, 15, 17]
-        # # 1,000 testing mazes for each larger maze_size in [19, 21, 23, 25, 27, 29, 31, 33, 35, 37, 59]
+        """ https://github.com/aks2203/easy-to-hard-data """
+        # 50,000 training mazes for maze_size [9]
+        # 10,000 testing mazes for each smaller maze_size in [9, 11, 13, 15, 17]
+        # 1,000 testing mazes for each larger maze_size in [19, 21, 23, 25, 27, 29, 31, 33, 35, 37, 59]
 
-        # if maze_size not in [9, 11, 13, 15, 17, 19, 21, 23, 25, 27, 29, 31, 33, 35, 37, 59]:
-        #     raise ValueError(f'Invalid maze size {maze_size} for easy-to-hard-data.')
+        if params.maze_size not in [9, 11, 13, 15, 17, 19, 21, 23, 25, 27, 29, 31, 33, 35, 37, 59]:
+            raise ValueError(f'Invalid maze size {params.maze_size} for easy-to-hard-data.')
 
-        # maze_dataset = EasyToHardMazeDataset(root='data/easy-to-hard-data/', train=False, size=maze_size)
-        # inputs = maze_dataset.inputs[:num_mazes].float().detach().to(DEVICE, dtype=torch.float32)
-        # solutions = maze_dataset.targets[:num_mazes].float().detach().to(DEVICE, dtype=torch.float32)
-    return torch.tensor([]), torch.tensor([])
+        maze_dataset = EasyToHardMazeDataset(root='data/easy-to-hard-data/', train=False, size=params.maze_size)
+
+        inputs = maze_dataset.inputs[: params.num_mazes].float().detach().to(DEVICE, dtype=torch.float32)
+        solutions = maze_dataset.targets[: params.num_mazes].float().detach().to(DEVICE, dtype=torch.float32)
+
+    return inputs, solutions
 
 
 def maze_loaders(
