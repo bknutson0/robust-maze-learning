@@ -2,9 +2,6 @@
 name = "robust-maze-learning"
 version = "0.1.0"
 description = "framework for training and testing maze-solving models"
-authors = [
-	{ name = "Brandon Knutson", email = "bknutson@mines.edu" }
-]
 readme = "README.md"
 requires-python = ">=3.10.6,<3.12.0"
 
