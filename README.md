@@ -18,13 +18,6 @@ Our study compares four models:
 | **PI-Net**       | path-independent implicit network |
 | **FF-Net**       | 30-layer ResNet |
 
-We probe three *orthogonal* difficulty axes (maze size, percolation, dead-end start) and analyse convergence with **Topological Data Analysis (TDA)**.  
-Results show:
-
-1. DT-Net copies deadend-filling on 99 % of 143 k mazes but inherits its failure modes.  
-2. Increasing training diversity (percolation > 0) fixes some errors yet *reduces* size extrapolation.  
-3. Successful solvers need not reach a unique fixed point; limit cycles are common and benign.
-
 ---
 
 ## 2 Installation
