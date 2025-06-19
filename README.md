@@ -71,9 +71,9 @@ robust-maze-learning
 
 | Task                                  | Command                       |
 | ------------------------------------- | ----------------------------- |
-| Train IT-Net on four percolations     | `uv run -m src.train`         |
-| Evaluate all checkpoints              | `uv run -m src.test`          |
-| Reproduce TDA of latent iterates      | `uv run -m src.tda`           |
+| Train a model on a dataset     | `uv run -m src.train`         |
+| Evaluate evaluate a model on selected datasets              | `uv run -m src.test`          |
+| Perform Toplogical Data Analysis (on latent iterates)     | `uv run -m src.tda`           |
 | Plot accuracy vs. percolation / size and heatmaps  | `uv run -m src.analyze`       |
 
 All outputs (metrics, PDFs) are written to `outputs/`.
