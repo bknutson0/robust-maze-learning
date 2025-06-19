@@ -11,12 +11,12 @@ This code accompanies the paper
 We revisit **logical extrapolation**—the ability to solve harder problem instances by running longer—in the context of maze solving.  
 Our study compares four models:
 
-| Model            | Type & Depth | Test-time Scaling | Key Finding |
-|------------------|-------------|-------------------|-------------|
-| **DT-Net**       | weight-tied ResNet-based recurrent network | ✓ | Emulates deadend-filling; converges to 2-point / 2-loop cycles |
-| **IT-Net**       | implicit variation of DT-Net  | ✓ | Converges to fixed points; robust to cycles |
-| **PI-Net**       | path-independent implicit network | ✓ | Near-algorithmic but less precise than DT-Net |
-| **FF-Net**       | 30-layer ResNet | ✗ | Strong in-distribution, poor extrapolation |
+| Model            | Type & Depth |
+|------------------|-------------|
+| **DT-Net**       | weight-tied ResNet-based recurrent network |
+| **IT-Net**       | implicit variation of DT-Net  |
+| **PI-Net**       | path-independent implicit network |
+| **FF-Net**       | 30-layer ResNet |
 
 We probe three *orthogonal* difficulty axes (maze size, percolation, dead-end start) and analyse convergence with **Topological Data Analysis (TDA)**.  
 Results show:
